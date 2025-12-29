@@ -285,7 +285,25 @@ async fn run_stream_server(
                         let video_rx = video_tx.subscribe();
 
                         tokio::spawn(async move {
-                            match tokio_tungstenite::accept_async(stream).await {
+                            // Custom callback to handle the jsmpeg protocol
+                            let callback = |req: &tokio_tungstenite::tungstenite::handshake::server::Request,
+                                           mut response: tokio_tungstenite::tungstenite::handshake::server::Response| {
+                                // Check if client requested the jsmpeg protocol
+                                if let Some(protocols) = req.headers().get("Sec-WebSocket-Protocol") {
+                                    if let Ok(protocols_str) = protocols.to_str() {
+                                        if protocols_str.contains("jsmpeg") {
+                                            // Echo back the jsmpeg protocol
+                                            response.headers_mut().insert(
+                                                "Sec-WebSocket-Protocol",
+                                                "jsmpeg".parse().unwrap(),
+                                            );
+                                        }
+                                    }
+                                }
+                                Ok(response)
+                            };
+
+                            match tokio_tungstenite::accept_hdr_async(stream, callback).await {
                                 Ok(ws_stream) => {
                                     log::info!("WebSocket handshake successful");
                                     handle_ws_connection(ws_stream, video_rx).await;
