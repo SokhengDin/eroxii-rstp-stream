@@ -168,7 +168,7 @@ async fn run_stream_server(
 
     // FFmpeg runner task
     let ffmpeg_task = tokio::spawn(async move {
-        let mut ffmpeg = match Command::new("ffmpeg")
+        let ffmpeg = match Command::new("ffmpeg")
             .args([
                 "-rtsp_transport", "tcp",      // Use TCP for RTSP (more reliable)
                 "-i", &rtsp_url_clone,          // Input RTSP URL
@@ -193,12 +193,14 @@ async fn run_stream_server(
             }
         };
 
-        *ffmpeg_handle_clone.lock().await = Some(ffmpeg.id().try_into().unwrap_or(0) as i32).map(|_| {
-            // Store process handle for cleanup - we need to return the child
-            unreachable!()
-        }).ok();
+        // Store the child process for cleanup
+        *ffmpeg_handle_clone.lock().await = Some(ffmpeg);
 
-        if let Some(stdout) = ffmpeg.stdout.take() {
+        if let Some(mut child) = ffmpeg_handle_clone.lock().await.take() {
+            let stdout = match child.stdout.take() {
+                Some(out) => out,
+                None => return,
+            };
             let mut reader = std::io::BufReader::new(stdout);
             let mut buffer = [0u8; 4096];
 
@@ -214,10 +216,10 @@ async fn run_stream_server(
                     }
                 }
             }
-        }
 
-        let _ = ffmpeg.kill();
-        let _ = ffmpeg.wait();
+            let _ = child.kill();
+            let _ = child.wait();
+        }
     });
 
     // Accept WebSocket connections
