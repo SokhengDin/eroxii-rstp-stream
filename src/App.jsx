@@ -1,7 +1,20 @@
 import { useState, useEffect } from 'react';
-import { invoke } from '@tauri-apps/api/core';
 import RTSPPlayer from './components/RTSPPlayer';
 import './App.css';
+
+// Detect if running in Tauri
+const isTauri = typeof window !== 'undefined' && window.__TAURI_INTERNALS__;
+
+// API base URL for Node.js server (browser mode)
+const API_BASE = 'http://127.0.0.1:3001';
+
+// Dynamic import for Tauri API (only when running in Tauri)
+let invoke = null;
+if (isTauri) {
+  import('@tauri-apps/api/core').then((module) => {
+    invoke = module.invoke;
+  });
+}
 
 // Global error handler
 window.addEventListener('error', (event) => {
@@ -28,21 +41,40 @@ function App() {
 
   const checkFfmpeg = async () => {
     try {
-      const available = await invoke('check_ffmpeg');
-      setFfmpegAvailable(available);
-      if (!available) {
-        setStatus('FFmpeg not found. Please install FFmpeg first.');
+      if (isTauri && invoke) {
+        const available = await invoke('check_ffmpeg');
+        setFfmpegAvailable(available);
+        if (!available) {
+          setStatus('FFmpeg not found. Please install FFmpeg first.');
+        }
+      } else {
+        // Browser mode - use Node.js server
+        const res = await fetch(`${API_BASE}/api/check-ffmpeg`);
+        const data = await res.json();
+        setFfmpegAvailable(data.available);
+        if (!data.available) {
+          setStatus('FFmpeg not found. Please install FFmpeg first.');
+        }
       }
     } catch (err) {
       setFfmpegAvailable(false);
-      setStatus(`Error checking FFmpeg: ${err}`);
+      const errorMsg = isTauri
+        ? `Error checking FFmpeg: ${err}`
+        : 'Cannot connect to server. Run: npm run server';
+      setStatus(errorMsg);
     }
   };
 
   const refreshStreams = async () => {
     try {
-      const activeStreams = await invoke('get_active_streams');
-      setStreams(activeStreams);
+      if (isTauri && invoke) {
+        const activeStreams = await invoke('get_active_streams');
+        setStreams(activeStreams);
+      } else {
+        const res = await fetch(`${API_BASE}/api/streams`);
+        const activeStreams = await res.json();
+        setStreams(activeStreams);
+      }
     } catch (err) {
       console.error('Error fetching streams:', err);
     }
@@ -53,11 +85,23 @@ function App() {
     setStatus('Starting stream...');
 
     try {
-      console.log('Calling start_stream with:', { rtspUrl, wsPort });
-      const response = await invoke('start_stream', {
-        rtspUrl: rtspUrl,
-        wsPort: wsPort,
-      });
+      let response;
+
+      if (isTauri && invoke) {
+        console.log('Calling start_stream with:', { rtspUrl, wsPort });
+        response = await invoke('start_stream', {
+          rtspUrl: rtspUrl,
+          wsPort: wsPort,
+        });
+      } else {
+        // Browser mode - use Node.js server
+        const res = await fetch(`${API_BASE}/api/start-stream`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ rtspUrl, wsPort }),
+        });
+        response = await res.json();
+      }
 
       console.log('Received response:', response);
 
@@ -82,9 +126,21 @@ function App() {
     if (!activeStream) return;
 
     try {
-      const response = await invoke('stop_stream', {
-        wsPort: activeStream.port,
-      });
+      let response;
+
+      if (isTauri && invoke) {
+        response = await invoke('stop_stream', {
+          wsPort: activeStream.port,
+        });
+      } else {
+        const res = await fetch(`${API_BASE}/api/stop-stream`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ wsPort: activeStream.port }),
+        });
+        response = await res.json();
+      }
+
       setStatus(response.message);
       setActiveStream(null);
       refreshStreams();
