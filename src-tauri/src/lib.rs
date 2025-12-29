@@ -287,10 +287,19 @@ async fn run_stream_server(
                         tokio::spawn(async move {
                             let callback = |req: &tokio_tungstenite::tungstenite::handshake::server::Request,
                                            mut response: tokio_tungstenite::tungstenite::handshake::server::Response| {
-                                // Accept any Sec-WebSocket-Protocol
+                                // Echo back the Sec-WebSocket-Protocol if client sent one
                                 if let Some(protocols) = req.headers().get("Sec-WebSocket-Protocol") {
                                     log::info!("Client requested protocols: {:?}", protocols);
-                                    // Don't add the protocol header to response - let tungstenite handle it
+                                    // Echo back the first protocol requested
+                                    if let Ok(proto_str) = protocols.to_str() {
+                                        let first_proto = proto_str.split(',').next().unwrap_or("").trim();
+                                        if !first_proto.is_empty() {
+                                            response.headers_mut().insert(
+                                                "Sec-WebSocket-Protocol",
+                                                first_proto.parse().unwrap()
+                                            );
+                                        }
+                                    }
                                 }
                                 Ok(response)
                             };

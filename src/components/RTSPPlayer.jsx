@@ -42,11 +42,16 @@ export default function RTSPPlayer({ wsUrl, width = 640, height = 480, autoplay 
         setStatus('connecting');
         setError(null);
 
-        playerRef.current = new window.JSMpeg.Player(wsUrl, {
+        // Create WebSocket without protocol to avoid handshake issues
+        const socket = new WebSocket(wsUrl);
+        socket.binaryType = 'arraybuffer';
+
+        playerRef.current = new window.JSMpeg.Player(null, {
           canvas: canvasRef.current,
           autoplay: autoplay,
           audio: false,
           videoBufferSize: 512 * 1024,
+          source: window.JSMpeg.Source.WebSocket,
           onSourceEstablished: () => {
             setStatus('connected');
           },
@@ -57,7 +62,34 @@ export default function RTSPPlayer({ wsUrl, width = 640, height = 480, autoplay 
             frameCountRef.current++;
           },
         });
+
+        // Connect our custom socket to the player
+        socket.onopen = () => {
+          console.log('WebSocket connected');
+          setStatus('connected');
+        };
+
+        socket.onmessage = (event) => {
+          if (playerRef.current && playerRef.current.source) {
+            playerRef.current.source.onMessage({ data: event.data });
+          }
+        };
+
+        socket.onerror = (err) => {
+          console.error('WebSocket error:', err);
+          setError('WebSocket connection error');
+          setStatus('error');
+        };
+
+        socket.onclose = () => {
+          console.log('WebSocket closed');
+          setStatus('disconnected');
+        };
+
+        // Store socket reference for cleanup
+        playerRef.current._customSocket = socket;
       } catch (err) {
+        console.error('Player error:', err);
         setError(err.message);
         setStatus('error');
       }
@@ -69,6 +101,10 @@ export default function RTSPPlayer({ wsUrl, width = 640, height = 480, autoplay 
       clearInterval(fpsInterval);
       clearInterval(frameUpdateInterval);
       if (playerRef.current) {
+        // Close custom socket if exists
+        if (playerRef.current._customSocket) {
+          playerRef.current._customSocket.close();
+        }
         playerRef.current.destroy();
         playerRef.current = null;
       }
