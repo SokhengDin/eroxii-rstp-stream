@@ -30,6 +30,7 @@ tokio = { version = "1", features = ["full"] }
 # WebSocket server
 tokio-tungstenite = "0.24"
 futures-util = "0.3"
+socket2 = "0.5"
 
 # FFmpeg wrapper (optional - for programmatic control)
 # ffmpeg-sidecar = "2.0"

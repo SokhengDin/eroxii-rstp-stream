@@ -1,7 +1,9 @@
 use futures_util::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
+use socket2::{Domain, Socket, Type};
 use std::collections::HashMap;
 use std::io::Read;
+use std::net::SocketAddr;
 use std::process::{Child, Command, Stdio};
 use std::sync::Arc;
 use tauri::State;
@@ -157,17 +159,16 @@ async fn run_stream_server(
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     log::info!("Attempting to bind WebSocket server on port {}", ws_port);
 
-    // Bind WebSocket server
-    let listener = match TcpListener::bind(format!("127.0.0.1:{}", ws_port)).await {
-        Ok(l) => {
-            log::info!("Successfully bound WebSocket server on port {}", ws_port);
-            l
-        }
-        Err(e) => {
-            log::error!("Failed to bind WebSocket server on port {}: {}", ws_port, e);
-            return Err(Box::new(e));
-        }
-    };
+    // Create socket with SO_REUSEADDR to allow quick rebinding
+    let addr: SocketAddr = format!("127.0.0.1:{}", ws_port).parse().unwrap();
+    let socket = Socket::new(Domain::IPV4, Type::STREAM, None)?;
+    socket.set_reuse_address(true)?;
+    socket.bind(&addr.into())?;
+    socket.listen(128)?;
+    socket.set_nonblocking(true)?;
+
+    let listener = TcpListener::from_std(socket.into())?;
+    log::info!("Successfully bound WebSocket server on port {}", ws_port);
 
     // Create a broadcast channel for video data
     let (video_tx, _) = broadcast::channel::<Vec<u8>>(100);
