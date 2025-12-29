@@ -175,62 +175,57 @@ async fn run_stream_server(
     let video_tx = Arc::new(video_tx);
 
     // Spawn FFmpeg process
-    let ffmpeg_handle = Arc::new(Mutex::new(None::<Child>));
-    let ffmpeg_handle_clone = Arc::clone(&ffmpeg_handle);
     let video_tx_clone = Arc::clone(&video_tx);
     let rtsp_url_clone = rtsp_url.clone();
 
-    // FFmpeg runner task
-    let ffmpeg_task = tokio::spawn(async move {
+    // FFmpeg runner task - use spawn_blocking for blocking I/O
+    let ffmpeg_task = tokio::task::spawn_blocking(move || {
         log::info!("Starting FFmpeg for RTSP URL: {}", rtsp_url_clone);
 
-        let ffmpeg = match Command::new("ffmpeg")
+        let mut child = match Command::new("ffmpeg")
             .args([
                 "-rtsp_transport", "tcp",      // Use TCP for RTSP (more reliable)
+                "-fflags", "nobuffer",         // Reduce buffering
+                "-flags", "low_delay",         // Low delay mode
                 "-i", &rtsp_url_clone,          // Input RTSP URL
                 "-f", "mpegts",                 // Output format: MPEG-TS
                 "-codec:v", "mpeg1video",       // Video codec for jsmpeg
                 "-s", "640x480",                // Resolution
                 "-b:v", "1000k",                // Video bitrate
                 "-bf", "0",                     // No B-frames (lower latency)
+                "-q:v", "5",                    // Quality level
                 "-r", "25",                     // Frame rate
-                "-an",                          // No audio (simplifies things)
+                "-an",                          // No audio
                 "-flush_packets", "1",          // Flush packets immediately
                 "pipe:1",                       // Output to stdout
             ])
             .stdout(Stdio::piped())
-            .stderr(Stdio::piped())  // Capture stderr instead of null
+            .stderr(Stdio::piped())
             .spawn()
         {
-            Ok(child) => child,
+            Ok(child) => {
+                log::info!("FFmpeg process started with PID: {:?}", child.id());
+                child
+            }
             Err(e) => {
                 log::error!("Failed to start FFmpeg: {}", e);
                 return;
             }
         };
 
-        // Store the child process for cleanup
-        *ffmpeg_handle_clone.lock().await = Some(ffmpeg);
+        let stdout = match child.stdout.take() {
+            Some(out) => out,
+            None => {
+                log::error!("Failed to get FFmpeg stdout");
+                return;
+            }
+        };
 
-        if let Some(mut child) = ffmpeg_handle_clone.lock().await.take() {
-            let stdout = match child.stdout.take() {
-                Some(out) => out,
-                None => {
-                    log::error!("Failed to get FFmpeg stdout");
-                    return;
-                }
-            };
+        let stderr = child.stderr.take();
 
-            let stderr = match child.stderr.take() {
-                Some(err) => err,
-                None => {
-                    log::error!("Failed to get FFmpeg stderr");
-                    return;
-                }
-            };
-
-            // Spawn a task to read and log stderr
-            tokio::spawn(async move {
+        // Spawn a thread to read stderr
+        if let Some(stderr) = stderr {
+            std::thread::spawn(move || {
                 use std::io::BufRead;
                 let stderr_reader = std::io::BufReader::new(stderr);
                 for line in stderr_reader.lines() {
@@ -239,37 +234,43 @@ async fn run_stream_server(
                     }
                 }
             });
+        }
 
-            let mut reader = std::io::BufReader::new(stdout);
-            let mut buffer = [0u8; 4096];
-            let mut total_bytes = 0;
+        let mut reader = std::io::BufReader::with_capacity(32768, stdout);
+        let mut buffer = [0u8; 32768];
+        let mut total_bytes: u64 = 0;
+        let mut last_log_bytes: u64 = 0;
 
-            log::info!("Starting to read FFmpeg output...");
+        log::info!("Starting to read FFmpeg output...");
 
-            loop {
-                match reader.read(&mut buffer) {
-                    Ok(0) => {
-                        log::info!("FFmpeg stream ended (EOF). Total bytes: {}", total_bytes);
-                        break;
+        loop {
+            match reader.read(&mut buffer) {
+                Ok(0) => {
+                    log::info!("FFmpeg stream ended (EOF). Total bytes: {}", total_bytes);
+                    break;
+                }
+                Ok(n) => {
+                    total_bytes += n as u64;
+
+                    // Log every 100KB
+                    if total_bytes - last_log_bytes >= 100000 {
+                        log::info!("FFmpeg: Streamed {} bytes, receivers: {}", total_bytes, video_tx_clone.receiver_count());
+                        last_log_bytes = total_bytes;
                     }
-                    Ok(n) => {
-                        total_bytes += n;
-                        if total_bytes % 100000 == 0 {
-                            log::debug!("Streamed {} bytes so far...", total_bytes);
-                        }
-                        let _ = video_tx_clone.send(buffer[..n].to_vec());
-                    }
-                    Err(e) => {
-                        log::error!("FFmpeg read error: {}", e);
-                        break;
-                    }
+
+                    // Always send data - receivers will get it when they connect
+                    let _ = video_tx_clone.send(buffer[..n].to_vec());
+                }
+                Err(e) => {
+                    log::error!("FFmpeg read error: {}", e);
+                    break;
                 }
             }
-
-            log::info!("Cleaning up FFmpeg process...");
-            let _ = child.kill();
-            let _ = child.wait();
         }
+
+        log::info!("Cleaning up FFmpeg process...");
+        let _ = child.kill();
+        let _ = child.wait();
     });
 
     // Accept WebSocket connections
