@@ -4,7 +4,7 @@ use socket2::{Domain, Socket, Type};
 use std::collections::HashMap;
 use std::io::Read;
 use std::net::SocketAddr;
-use std::process::{Child, Command, Stdio};
+use std::process::{Command, Stdio};
 use std::sync::Arc;
 use tauri::State;
 use tokio::net::TcpListener;
@@ -324,11 +324,8 @@ async fn run_stream_server(
         }
     }
 
-    // Cleanup
+    // Cleanup - abort the blocking FFmpeg task
     ffmpeg_task.abort();
-    if let Some(mut child) = ffmpeg_handle.lock().await.take() {
-        let _ = child.kill();
-    }
 
     Ok(())
 }
