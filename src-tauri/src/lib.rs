@@ -155,9 +155,19 @@ async fn run_stream_server(
     ws_port: u16,
     mut shutdown_rx: broadcast::Receiver<()>,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    log::info!("Attempting to bind WebSocket server on port {}", ws_port);
+
     // Bind WebSocket server
-    let listener = TcpListener::bind(format!("127.0.0.1:{}", ws_port)).await?;
-    log::info!("WebSocket server listening on port {}", ws_port);
+    let listener = match TcpListener::bind(format!("127.0.0.1:{}", ws_port)).await {
+        Ok(l) => {
+            log::info!("Successfully bound WebSocket server on port {}", ws_port);
+            l
+        }
+        Err(e) => {
+            log::error!("Failed to bind WebSocket server on port {}: {}", ws_port, e);
+            return Err(Box::new(e));
+        }
+    };
 
     // Create a broadcast channel for video data
     let (video_tx, _) = broadcast::channel::<Vec<u8>>(100);
@@ -275,8 +285,24 @@ async fn run_stream_server(
                         let video_rx = video_tx.subscribe();
 
                         tokio::spawn(async move {
-                            if let Ok(ws_stream) = tokio_tungstenite::accept_async(stream).await {
-                                handle_ws_connection(ws_stream, video_rx).await;
+                            let callback = |req: &tokio_tungstenite::tungstenite::handshake::server::Request,
+                                           mut response: tokio_tungstenite::tungstenite::handshake::server::Response| {
+                                // Accept any Sec-WebSocket-Protocol
+                                if let Some(protocols) = req.headers().get("Sec-WebSocket-Protocol") {
+                                    log::info!("Client requested protocols: {:?}", protocols);
+                                    // Don't add the protocol header to response - let tungstenite handle it
+                                }
+                                Ok(response)
+                            };
+
+                            match tokio_tungstenite::accept_hdr_async(stream, callback).await {
+                                Ok(ws_stream) => {
+                                    log::info!("WebSocket handshake successful");
+                                    handle_ws_connection(ws_stream, video_rx).await;
+                                }
+                                Err(e) => {
+                                    log::error!("WebSocket handshake failed: {}", e);
+                                }
                             }
                         });
                     }
