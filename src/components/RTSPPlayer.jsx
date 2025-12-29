@@ -1,22 +1,40 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 
 // JSMpeg player component for RTSP streams
-export default function RTSPPlayer({ wsUrl, width = 640, height = 480, autoplay = true }) {
+export default function RTSPPlayer({ wsUrl, width = 640, height = 480 }) {
   const canvasRef = useRef(null);
   const playerRef = useRef(null);
+  const socketRef = useRef(null);
   const frameCountRef = useRef(0);
   const [status, setStatus] = useState('disconnected');
   const [error, setError] = useState(null);
   const [frameCount, setFrameCount] = useState(0);
   const [fps, setFps] = useState(0);
 
+  const cleanup = useCallback(() => {
+    if (socketRef.current) {
+      socketRef.current.close();
+      socketRef.current = null;
+    }
+    if (playerRef.current) {
+      try {
+        playerRef.current.destroy();
+      } catch (e) {
+        // Ignore destroy errors
+      }
+      playerRef.current = null;
+    }
+  }, []);
+
   useEffect(() => {
     if (!wsUrl || !canvasRef.current) return;
 
-    // Reset frame counter
+    // Reset state
     frameCountRef.current = 0;
     setFrameCount(0);
     setFps(0);
+    setError(null);
+    setStatus('connecting');
 
     // FPS calculation interval
     let lastFrameCount = 0;
@@ -26,7 +44,7 @@ export default function RTSPPlayer({ wsUrl, width = 640, height = 480, autoplay 
       lastFrameCount = currentFrames;
     }, 1000);
 
-    // Frame counter interval (update UI every 100ms to avoid too many re-renders)
+    // Frame counter interval
     const frameUpdateInterval = setInterval(() => {
       setFrameCount(frameCountRef.current);
     }, 100);
@@ -34,62 +52,65 @@ export default function RTSPPlayer({ wsUrl, width = 640, height = 480, autoplay 
     // Wait for JSMpeg to be loaded
     const initPlayer = () => {
       if (typeof window.JSMpeg === 'undefined') {
+        console.log('Waiting for JSMpeg to load...');
         setTimeout(initPlayer, 100);
         return;
       }
 
-      try {
-        setStatus('connecting');
-        setError(null);
+      console.log('JSMpeg loaded, connecting to:', wsUrl);
 
-        // Create WebSocket without protocol to avoid handshake issues
+      try {
+        // Create WebSocket manually without subprotocol
         const socket = new WebSocket(wsUrl);
         socket.binaryType = 'arraybuffer';
+        socketRef.current = socket;
 
-        playerRef.current = new window.JSMpeg.Player(null, {
-          canvas: canvasRef.current,
-          autoplay: autoplay,
-          audio: false,
-          videoBufferSize: 512 * 1024,
-          source: window.JSMpeg.Source.WebSocket,
-          onSourceEstablished: () => {
-            setStatus('connected');
-          },
-          onSourceCompleted: () => {
-            setStatus('disconnected');
-          },
-          onVideoDecode: () => {
-            frameCountRef.current++;
-          },
-        });
-
-        // Connect our custom socket to the player
         socket.onopen = () => {
-          console.log('WebSocket connected');
+          console.log('WebSocket opened, creating player...');
           setStatus('connected');
-        };
 
-        socket.onmessage = (event) => {
-          if (playerRef.current && playerRef.current.source) {
-            playerRef.current.source.onMessage({ data: event.data });
+          // Create player with the open socket
+          try {
+            playerRef.current = new window.JSMpeg.Player(null, {
+              canvas: canvasRef.current,
+              autoplay: true,
+              audio: false,
+              videoBufferSize: 1024 * 1024,
+              onVideoDecode: () => {
+                frameCountRef.current++;
+              },
+            });
+
+            // Manually inject data into player's demuxer
+            if (playerRef.current.demuxer) {
+              socket.onmessage = (event) => {
+                if (playerRef.current && playerRef.current.demuxer) {
+                  playerRef.current.demuxer.write(event.data);
+                }
+              };
+            }
+          } catch (err) {
+            console.error('Error creating player:', err);
+            setError('Failed to create video player');
+            setStatus('error');
           }
         };
 
         socket.onerror = (err) => {
           console.error('WebSocket error:', err);
-          setError('WebSocket connection error');
+          setError('Connection error');
           setStatus('error');
         };
 
-        socket.onclose = () => {
-          console.log('WebSocket closed');
-          setStatus('disconnected');
+        socket.onclose = (event) => {
+          console.log('WebSocket closed:', event.code, event.reason);
+          if (status !== 'error') {
+            setStatus('disconnected');
+          }
         };
 
-        // Store socket reference for cleanup
-        playerRef.current._customSocket = socket;
       } catch (err) {
-        console.error('Player error:', err);
+        console.error('Error initializing:', err);
         setError(err.message);
         setStatus('error');
       }
@@ -100,16 +121,9 @@ export default function RTSPPlayer({ wsUrl, width = 640, height = 480, autoplay 
     return () => {
       clearInterval(fpsInterval);
       clearInterval(frameUpdateInterval);
-      if (playerRef.current) {
-        // Close custom socket if exists
-        if (playerRef.current._customSocket) {
-          playerRef.current._customSocket.close();
-        }
-        playerRef.current.destroy();
-        playerRef.current = null;
-      }
+      cleanup();
     };
-  }, [wsUrl, autoplay]);
+  }, [wsUrl, cleanup]);
 
   const getStatusColor = () => {
     switch (status) {
