@@ -1,116 +1,391 @@
-.logo.vite:hover {
-  filter: drop-shadow(0 0 2em #747bff);
-}
-
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafb);
-}
 :root {
   font-family: Inter, Avenir, Helvetica, Arial, sans-serif;
   font-size: 16px;
   line-height: 24px;
   font-weight: 400;
-
   color: #0f0f0f;
   background-color: #f6f6f6;
-
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  -webkit-text-size-adjust: 100%;
 }
 
 .container {
-  margin: 0;
-  padding-top: 10vh;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  text-align: center;
-}
-
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: 0.75s;
-}
-
-.logo.tauri:hover {
-  filter: drop-shadow(0 0 2em #24c8db);
-}
-
-.row {
-  display: flex;
-  justify-content: center;
-}
-
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
-}
-
-a:hover {
-  color: #535bf2;
+  margin: 0 auto;
+  padding: 20px;
+  max-width: 900px;
 }
 
 h1 {
   text-align: center;
+  margin-bottom: 20px;
+  color: #333;
+}
+
+h2, h3 {
+  color: #444;
+}
+
+/* FFmpeg Status */
+.ffmpeg-status {
+  text-align: center;
+  padding: 8px 16px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  font-weight: 500;
+}
+
+.ffmpeg-status.available {
+  background-color: #d1fae5;
+  color: #065f46;
+}
+
+.ffmpeg-status.unavailable {
+  background-color: #fee2e2;
+  color: #991b1b;
+}
+
+/* Stream Form */
+.stream-form {
+  background: #fff;
+  padding: 20px;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  margin-bottom: 20px;
+}
+
+.form-group {
+  margin-bottom: 16px;
+  text-align: left;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 6px;
+  font-weight: 500;
+  color: #374151;
+}
+
+.form-group input {
+  width: 100%;
+  box-sizing: border-box;
 }
 
 input,
 button {
   border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
+  border: 1px solid #d1d5db;
+  padding: 10px 16px;
   font-size: 1em;
-  font-weight: 500;
   font-family: inherit;
-  color: #0f0f0f;
-  background-color: #ffffff;
-  transition: border-color 0.25s;
-  box-shadow: 0 2px 2px rgba(0, 0, 0, 0.2);
+  transition: all 0.2s;
+}
+
+input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+}
+
+input:disabled {
+  background-color: #f3f4f6;
+  cursor: not-allowed;
+}
+
+.button-group {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin-top: 20px;
 }
 
 button {
   cursor: pointer;
+  background-color: #3b82f6;
+  color: white;
+  border: none;
+  font-weight: 500;
+  min-width: 140px;
 }
 
-button:hover {
-  border-color: #396cd8;
-}
-button:active {
-  border-color: #396cd8;
-  background-color: #e8e8e8;
+button:hover:not(:disabled) {
+  background-color: #2563eb;
 }
 
-input,
-button {
-  outline: none;
+button:active:not(:disabled) {
+  background-color: #1d4ed8;
 }
 
-#greet-input {
-  margin-right: 5px;
+button:disabled {
+  background-color: #9ca3af;
+  cursor: not-allowed;
 }
 
+button.stop-btn {
+  background-color: #ef4444;
+}
+
+button.stop-btn:hover {
+  background-color: #dc2626;
+}
+
+/* Status Message */
+.status-message {
+  text-align: center;
+  padding: 10px;
+  background-color: #fef3c7;
+  color: #92400e;
+  border-radius: 8px;
+  margin-bottom: 20px;
+}
+
+/* Player Container */
+.player-container {
+  background: #fff;
+  padding: 20px;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+.player-container h2 {
+  margin-top: 0;
+  margin-bottom: 10px;
+}
+
+.stream-info {
+  font-size: 0.9em;
+  color: #6b7280;
+  margin-bottom: 15px;
+  word-break: break-all;
+}
+
+/* RTSP Player Component */
+.rtsp-player {
+  display: inline-block;
+  position: relative;
+}
+
+.player-stats {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+  padding: 8px 12px;
+  background: #f3f4f6;
+  border-radius: 8px;
+}
+
+.player-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.status-text {
+  font-size: 0.9em;
+  text-transform: capitalize;
+  color: #6b7280;
+}
+
+.frame-stats {
+  display: flex;
+  gap: 16px;
+}
+
+.stat-item {
+  font-size: 0.85em;
+  color: #374151;
+}
+
+.stat-item strong {
+  color: #1f2937;
+}
+
+.video-canvas {
+  background: #000;
+  border-radius: 8px;
+  max-width: 100%;
+  height: auto;
+}
+
+.player-error {
+  color: #ef4444;
+  font-size: 0.9em;
+  margin-top: 10px;
+}
+
+/* Streams List */
+.streams-list {
+  background: #fff;
+  padding: 20px;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  margin-bottom: 20px;
+  text-align: left;
+}
+
+.streams-list h3 {
+  margin-top: 0;
+}
+
+.streams-list ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.streams-list li {
+  padding: 8px 12px;
+  background: #f3f4f6;
+  border-radius: 6px;
+  margin-bottom: 8px;
+  font-family: monospace;
+  font-size: 0.9em;
+  word-break: break-all;
+}
+
+/* Help Section */
+.help-section {
+  background: #f8fafc;
+  padding: 20px;
+  border-radius: 12px;
+  text-align: left;
+  border: 1px solid #e2e8f0;
+}
+
+.help-section h3 {
+  margin-top: 0;
+  color: #1e293b;
+}
+
+.help-section ol,
+.help-section ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.help-section li {
+  margin-bottom: 8px;
+  color: #475569;
+}
+
+.help-section .note {
+  margin-top: 15px;
+  margin-bottom: 8px;
+}
+
+.url-examples {
+  font-family: monospace;
+  font-size: 0.85em;
+  background: #fff;
+  padding: 12px 20px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+}
+
+.url-examples li {
+  margin-bottom: 6px;
+  word-break: break-all;
+}
+
+/* Dark Mode */
 @media (prefers-color-scheme: dark) {
   :root {
     color: #f6f6f6;
-    background-color: #2f2f2f;
+    background-color: #1a1a1a;
   }
 
-  a:hover {
-    color: #24c8db;
+  h1, h2, h3 {
+    color: #f6f6f6;
   }
 
-  input,
-  button {
-    color: #ffffff;
-    background-color: #0f0f0f98;
+  .ffmpeg-status.available {
+    background-color: #065f46;
+    color: #d1fae5;
   }
-  button:active {
-    background-color: #0f0f0f69;
+
+  .ffmpeg-status.unavailable {
+    background-color: #7f1d1d;
+    color: #fecaca;
+  }
+
+  .stream-form,
+  .player-container,
+  .streams-list {
+    background: #2a2a2a;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  }
+
+  .form-group label {
+    color: #d1d5db;
+  }
+
+  input {
+    background-color: #374151;
+    border-color: #4b5563;
+    color: #f6f6f6;
+  }
+
+  input:focus {
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
+  }
+
+  input:disabled {
+    background-color: #1f2937;
+  }
+
+  .status-message {
+    background-color: #78350f;
+    color: #fef3c7;
+  }
+
+  .stream-info {
+    color: #9ca3af;
+  }
+
+  .streams-list li {
+    background: #374151;
+    color: #e5e7eb;
+  }
+
+  .player-stats {
+    background: #374151;
+  }
+
+  .stat-item {
+    color: #d1d5db;
+  }
+
+  .stat-item strong {
+    color: #f3f4f6;
+  }
+
+  .help-section {
+    background: #262626;
+    border-color: #404040;
+  }
+
+  .help-section h3 {
+    color: #f6f6f6;
+  }
+
+  .help-section li {
+    color: #d1d5db;
+  }
+
+  .url-examples {
+    background: #1f2937;
+    border-color: #374151;
+    color: #e5e7eb;
   }
 }
