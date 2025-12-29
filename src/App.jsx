@@ -3,8 +3,17 @@ import { invoke } from '@tauri-apps/api/core';
 import RTSPPlayer from './components/RTSPPlayer';
 import './App.css';
 
+// Global error handler
+window.addEventListener('error', (event) => {
+  console.error('Global error:', event.error);
+});
+
+window.addEventListener('unhandledrejection', (event) => {
+  console.error('Unhandled promise rejection:', event.reason);
+});
+
 function App() {
-  const [rtspUrl, setRtspUrl] = useState('rtsp://192.168.1.100:554/stream');
+  const [rtspUrl, setRtspUrl] = useState('rtsp://admin:admin@168@192.168.11.12//:8000');
   const [wsPort, setWsPort] = useState(9999);
   const [activeStream, setActiveStream] = useState(null);
   const [status, setStatus] = useState('');
@@ -44,23 +53,27 @@ function App() {
     setStatus('Starting stream...');
 
     try {
+      console.log('Calling start_stream with:', { rtspUrl, wsPort });
       const response = await invoke('start_stream', {
         rtspUrl: rtspUrl,
         wsPort: wsPort,
       });
 
-      if (response.success) {
+      console.log('Received response:', response);
+
+      if (response && response.success) {
         setActiveStream({
           wsUrl: response.ws_url,
           port: response.port,
           rtspUrl: rtspUrl,
         });
         setStatus(response.message);
-        refreshStreams();
+        await refreshStreams();
       } else {
-        setStatus(`Error: ${response.message}`);
+        setStatus(`Error: ${response?.message || 'Unknown error'}`);
       }
     } catch (err) {
+      console.error('Error starting stream:', err);
       setStatus(`Error: ${err}`);
     }
   };
