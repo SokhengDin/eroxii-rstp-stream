@@ -5,6 +5,7 @@ export default function RTSPPlayer({ wsUrl, width = 640, height = 480 }) {
   const canvasRef = useRef(null);
   const playerRef = useRef(null);
   const frameCountRef = useRef(0);
+  const initializingRef = useRef(false);
   const [status, setStatus] = useState('disconnected');
   const [error, setError] = useState(null);
   const [frameCount, setFrameCount] = useState(0);
@@ -19,13 +20,18 @@ export default function RTSPPlayer({ wsUrl, width = 640, height = 480 }) {
       }
       playerRef.current = null;
     }
+    initializingRef.current = false;
   }, []);
 
   useEffect(() => {
     if (!wsUrl || !canvasRef.current) return;
 
-    // Cleanup any existing connection
-    cleanup();
+    // Prevent double initialization (React StrictMode)
+    if (initializingRef.current || playerRef.current) {
+      console.log('Player already initializing or exists, skipping...');
+      return;
+    }
+    initializingRef.current = true;
 
     // Reset state
     frameCountRef.current = 0;
@@ -52,6 +58,12 @@ export default function RTSPPlayer({ wsUrl, width = 640, height = 480 }) {
       if (typeof window.JSMpeg === 'undefined') {
         console.log('Waiting for JSMpeg to load...');
         setTimeout(initPlayer, 100);
+        return;
+      }
+
+      // Check if we were cleaned up while waiting
+      if (!initializingRef.current) {
+        console.log('Initialization cancelled');
         return;
       }
 
@@ -103,13 +115,15 @@ export default function RTSPPlayer({ wsUrl, width = 640, height = 480 }) {
         console.error('Error creating player:', err);
         setError(err.message || 'Failed to create player');
         setStatus('error');
+        initializingRef.current = false;
       }
     };
 
-    // Small delay to ensure canvas is ready
-    setTimeout(initPlayer, 100);
+    // Delay to allow WebSocket server and FFmpeg to start
+    const initTimeout = setTimeout(initPlayer, 500);
 
     return () => {
+      clearTimeout(initTimeout);
       clearInterval(fpsInterval);
       clearInterval(frameUpdateInterval);
       cleanup();
