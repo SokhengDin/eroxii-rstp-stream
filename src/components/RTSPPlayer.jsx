@@ -4,7 +4,6 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 export default function RTSPPlayer({ wsUrl, width = 640, height = 480 }) {
   const canvasRef = useRef(null);
   const playerRef = useRef(null);
-  const socketRef = useRef(null);
   const frameCountRef = useRef(0);
   const [status, setStatus] = useState('disconnected');
   const [error, setError] = useState(null);
@@ -12,10 +11,6 @@ export default function RTSPPlayer({ wsUrl, width = 640, height = 480 }) {
   const [fps, setFps] = useState(0);
 
   const cleanup = useCallback(() => {
-    if (socketRef.current) {
-      socketRef.current.close();
-      socketRef.current = null;
-    }
     if (playerRef.current) {
       try {
         playerRef.current.destroy();
@@ -28,6 +23,9 @@ export default function RTSPPlayer({ wsUrl, width = 640, height = 480 }) {
 
   useEffect(() => {
     if (!wsUrl || !canvasRef.current) return;
+
+    // Cleanup any existing connection
+    cleanup();
 
     // Reset state
     frameCountRef.current = 0;
@@ -57,66 +55,59 @@ export default function RTSPPlayer({ wsUrl, width = 640, height = 480 }) {
         return;
       }
 
-      console.log('JSMpeg loaded, connecting to:', wsUrl);
+      console.log('JSMpeg loaded, creating player with URL:', wsUrl);
 
       try {
-        // Create WebSocket manually without subprotocol
-        const socket = new WebSocket(wsUrl);
-        socket.binaryType = 'arraybuffer';
-        socketRef.current = socket;
-
-        socket.onopen = () => {
-          console.log('WebSocket opened, creating player...');
-          setStatus('connected');
-
-          // Create player with the open socket
-          try {
-            playerRef.current = new window.JSMpeg.Player(null, {
-              canvas: canvasRef.current,
-              autoplay: true,
-              audio: false,
-              videoBufferSize: 1024 * 1024,
-              onVideoDecode: () => {
-                frameCountRef.current++;
-              },
-            });
-
-            // Manually inject data into player's demuxer
-            if (playerRef.current.demuxer) {
-              socket.onmessage = (event) => {
-                if (playerRef.current && playerRef.current.demuxer) {
-                  playerRef.current.demuxer.write(event.data);
-                }
-              };
-            }
-          } catch (err) {
-            console.error('Error creating player:', err);
-            setError('Failed to create video player');
-            setStatus('error');
-          }
-        };
-
-        socket.onerror = (err) => {
-          console.error('WebSocket error:', err);
-          setError('Connection error');
-          setStatus('error');
-        };
-
-        socket.onclose = (event) => {
-          console.log('WebSocket closed:', event.code, event.reason);
-          if (status !== 'error') {
+        // Create player with proper options for binary WebSocket stream
+        const player = new window.JSMpeg.Player(wsUrl, {
+          canvas: canvasRef.current,
+          autoplay: true,
+          audio: false,
+          video: true,
+          loop: false,
+          pauseWhenHidden: false,
+          disableGl: false,
+          disableWebAssembly: false,
+          videoBufferSize: 512 * 1024,
+          maxAudioLag: 0.25,
+          onSourceEstablished: (source) => {
+            console.log('Source established:', source);
+            setStatus('connected');
+          },
+          onSourceCompleted: () => {
+            console.log('Source completed');
             setStatus('disconnected');
-          }
-        };
+          },
+          onVideoDecode: () => {
+            frameCountRef.current++;
+          },
+          onStalled: () => {
+            console.log('Stream stalled');
+            setStatus('stalled');
+          },
+          onEnded: () => {
+            console.log('Stream ended');
+            setStatus('ended');
+          },
+        });
+
+        playerRef.current = player;
+        console.log('Player created successfully:', player);
+
+        // Log player state
+        if (player.source) {
+          console.log('Source type:', player.source.constructor.name);
+        }
 
       } catch (err) {
-        console.error('Error initializing:', err);
-        setError(err.message);
+        console.error('Error creating player:', err);
+        setError(err.message || 'Failed to create player');
         setStatus('error');
       }
     };
 
-    initPlayer();
+    // Small delay to ensure canvas is ready
+    setTimeout(initPlayer, 100);
 
     return () => {
       clearInterval(fpsInterval);
