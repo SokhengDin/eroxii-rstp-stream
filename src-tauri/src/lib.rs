@@ -8,7 +8,7 @@ use std::process::{Command, Stdio};
 use std::sync::Arc;
 use tauri::State;
 use tokio::net::TcpListener;
-use tokio::sync::{broadcast, Mutex, RwLock};
+use tokio::sync::{broadcast, RwLock};
 use tokio_tungstenite::tungstenite::Message;
 
 // Stream state management
