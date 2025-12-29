@@ -4,6 +4,12 @@ import http from 'http';
 
 const streams = new Map();
 
+// FFmpeg path - change this if FFmpeg is not in PATH
+// Windows example: 'C:\\ffmpeg\\bin\\ffmpeg.exe'
+// Mac/Linux example: '/usr/local/bin/ffmpeg'
+const FFMPEG_PATH = process.env.FFMPEG_PATH || 'ffmpeg';
+console.log(`Using FFmpeg: ${FFMPEG_PATH}`);
+
 // Create HTTP server for API endpoints
 const httpServer = http.createServer((req, res) => {
   // CORS headers
@@ -21,7 +27,7 @@ const httpServer = http.createServer((req, res) => {
 
   // Check FFmpeg availability
   if (url.pathname === '/api/check-ffmpeg') {
-    const ffmpeg = spawn('ffmpeg', ['-version']);
+    const ffmpeg = spawn(FFMPEG_PATH, ['-version']);
     ffmpeg.on('error', () => {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ available: false }));
@@ -103,7 +109,7 @@ function startStream(rtspUrl, wsPort) {
   const wss = new WebSocketServer({ port: wsPort });
 
   // Start FFmpeg
-  const ffmpeg = spawn('ffmpeg', [
+  const ffmpeg = spawn(FFMPEG_PATH, [
     '-rtsp_transport', 'tcp',
     '-fflags', 'nobuffer',
     '-flags', 'low_delay',
