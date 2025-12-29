@@ -43,10 +43,13 @@ async fn start_stream(
     ws_port: u16,
     stream_manager: State<'_, Arc<StreamManager>>,
 ) -> Result<StreamResponse, String> {
+    log::info!("Received start_stream request: rtsp_url={}, ws_port={}", rtsp_url, ws_port);
+
     // Check if port is already in use
     {
         let streams = stream_manager.streams.read().await;
         if streams.contains_key(&ws_port) {
+            log::warn!("Port {} is already in use", ws_port);
             return Ok(StreamResponse {
                 success: false,
                 message: format!("Port {} is already in use", ws_port),
@@ -168,6 +171,8 @@ async fn run_stream_server(
 
     // FFmpeg runner task
     let ffmpeg_task = tokio::spawn(async move {
+        log::info!("Starting FFmpeg for RTSP URL: {}", rtsp_url_clone);
+
         let ffmpeg = match Command::new("ffmpeg")
             .args([
                 "-rtsp_transport", "tcp",      // Use TCP for RTSP (more reliable)
@@ -183,7 +188,7 @@ async fn run_stream_server(
                 "pipe:1",                       // Output to stdout
             ])
             .stdout(Stdio::piped())
-            .stderr(Stdio::null())
+            .stderr(Stdio::piped())  // Capture stderr instead of null
             .spawn()
         {
             Ok(child) => child,
@@ -199,15 +204,48 @@ async fn run_stream_server(
         if let Some(mut child) = ffmpeg_handle_clone.lock().await.take() {
             let stdout = match child.stdout.take() {
                 Some(out) => out,
-                None => return,
+                None => {
+                    log::error!("Failed to get FFmpeg stdout");
+                    return;
+                }
             };
+
+            let stderr = match child.stderr.take() {
+                Some(err) => err,
+                None => {
+                    log::error!("Failed to get FFmpeg stderr");
+                    return;
+                }
+            };
+
+            // Spawn a task to read and log stderr
+            tokio::spawn(async move {
+                use std::io::BufRead;
+                let stderr_reader = std::io::BufReader::new(stderr);
+                for line in stderr_reader.lines() {
+                    if let Ok(line) = line {
+                        log::info!("FFmpeg: {}", line);
+                    }
+                }
+            });
+
             let mut reader = std::io::BufReader::new(stdout);
             let mut buffer = [0u8; 4096];
+            let mut total_bytes = 0;
+
+            log::info!("Starting to read FFmpeg output...");
 
             loop {
                 match reader.read(&mut buffer) {
-                    Ok(0) => break, // EOF
+                    Ok(0) => {
+                        log::info!("FFmpeg stream ended (EOF). Total bytes: {}", total_bytes);
+                        break;
+                    }
                     Ok(n) => {
+                        total_bytes += n;
+                        if total_bytes % 100000 == 0 {
+                            log::debug!("Streamed {} bytes so far...", total_bytes);
+                        }
                         let _ = video_tx_clone.send(buffer[..n].to_vec());
                     }
                     Err(e) => {
@@ -217,6 +255,7 @@ async fn run_stream_server(
                 }
             }
 
+            log::info!("Cleaning up FFmpeg process...");
             let _ = child.kill();
             let _ = child.wait();
         }
