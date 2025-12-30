@@ -1,13 +1,80 @@
 import { WebSocketServer } from 'ws';
-import { spawn } from 'child_process';
+import { spawn, spawnSync } from 'child_process';
 import http from 'http';
+import { existsSync, readdirSync } from 'fs';
+import { homedir } from 'os';
+import { join } from 'path';
 
 const streams = new Map();
 
-// FFmpeg path - change this if FFmpeg is not in PATH
-// Windows example: 'C:\\ffmpeg\\bin\\ffmpeg.exe'
-// Mac/Linux example: '/usr/local/bin/ffmpeg'
-const FFMPEG_PATH = process.env.FFMPEG_PATH || 'ffmpeg';
+// Search for ffmpeg.exe recursively in a directory
+function searchFFmpegInDir(dir, depth = 0) {
+  if (depth > 3) return null; // Limit search depth
+  try {
+    const items = readdirSync(dir, { withFileTypes: true });
+    for (const item of items) {
+      if (item.isFile() && item.name.toLowerCase() === 'ffmpeg.exe') {
+        return join(dir, item.name);
+      }
+    }
+    for (const item of items) {
+      if (item.isDirectory() && !item.name.startsWith('.')) {
+        const found = searchFFmpegInDir(join(dir, item.name), depth + 1);
+        if (found) return found;
+      }
+    }
+  } catch {}
+  return null;
+}
+
+// Find FFmpeg - check common locations
+function findFFmpeg() {
+  // If explicitly set via env var, use that
+  if (process.env.FFMPEG_PATH) {
+    return process.env.FFMPEG_PATH;
+  }
+
+  // Check if ffmpeg is in PATH
+  const testResult = spawnSync('ffmpeg', ['-version'], { stdio: 'ignore', shell: true });
+  if (testResult.status === 0) {
+    return 'ffmpeg';
+  }
+
+  // Common Windows locations
+  const windowsPaths = [
+    join(homedir(), 'AppData', 'Local', 'Microsoft', 'WinGet', 'Links', 'ffmpeg.exe'),
+    'C:\\ffmpeg\\bin\\ffmpeg.exe',
+    'C:\\Program Files\\ffmpeg\\bin\\ffmpeg.exe',
+    join(homedir(), 'scoop', 'apps', 'ffmpeg', 'current', 'bin', 'ffmpeg.exe'),
+  ];
+
+  // Search WinGet packages folder
+  const wingetBase = join(homedir(), 'AppData', 'Local', 'Microsoft', 'WinGet', 'Packages');
+  if (existsSync(wingetBase)) {
+    try {
+      const dirs = readdirSync(wingetBase);
+      for (const dir of dirs) {
+        if (dir.toLowerCase().includes('ffmpeg')) {
+          const found = searchFFmpegInDir(join(wingetBase, dir));
+          if (found) {
+            windowsPaths.unshift(found);
+            break;
+          }
+        }
+      }
+    } catch {}
+  }
+
+  for (const p of windowsPaths) {
+    if (existsSync(p)) {
+      return p;
+    }
+  }
+
+  return 'ffmpeg'; // fallback
+}
+
+const FFMPEG_PATH = findFFmpeg();
 console.log(`Using FFmpeg: ${FFMPEG_PATH}`);
 
 // Create HTTP server for API endpoints
