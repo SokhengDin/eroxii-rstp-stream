@@ -293,26 +293,35 @@ async fn run_stream_server(
     let ffmpeg_task = tokio::task::spawn_blocking(move || {
         log::info!("Starting FFmpeg ({}) for RTSP URL: {}", ffmpeg_path, rtsp_url_clone);
 
-        let mut child = match Command::new(&ffmpeg_path)
-            .args([
-                "-rtsp_transport", "tcp",      // Use TCP for RTSP (more reliable)
-                "-fflags", "nobuffer",         // Reduce buffering
-                "-flags", "low_delay",         // Low delay mode
-                "-i", &rtsp_url_clone,          // Input RTSP URL
-                "-f", "mpegts",                 // Output format: MPEG-TS
-                "-codec:v", "mpeg1video",       // Video codec for jsmpeg
-                "-s", "640x480",                // Resolution
-                "-b:v", "1000k",                // Video bitrate
-                "-bf", "0",                     // No B-frames (lower latency)
-                "-q:v", "5",                    // Quality level
-                "-r", "25",                     // Frame rate
-                "-an",                          // No audio
-                "-flush_packets", "1",          // Flush packets immediately
-                "pipe:1",                       // Output to stdout
-            ])
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
+        let mut cmd = Command::new(&ffmpeg_path);
+        cmd.args([
+            "-rtsp_transport", "tcp",      // Use TCP for RTSP (more reliable)
+            "-fflags", "nobuffer",         // Reduce buffering
+            "-flags", "low_delay",         // Low delay mode
+            "-i", &rtsp_url_clone,          // Input RTSP URL
+            "-f", "mpegts",                 // Output format: MPEG-TS
+            "-codec:v", "mpeg1video",       // Video codec for jsmpeg
+            "-s", "640x480",                // Resolution
+            "-b:v", "1000k",                // Video bitrate
+            "-bf", "0",                     // No B-frames (lower latency)
+            "-q:v", "5",                    // Quality level
+            "-r", "25",                     // Frame rate
+            "-an",                          // No audio
+            "-flush_packets", "1",          // Flush packets immediately
+            "pipe:1",                       // Output to stdout
+        ])
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+
+        // Hide console window on Windows
+        #[cfg(target_os = "windows")]
+        {
+            use std::os::windows::process::CommandExt;
+            const CREATE_NO_WINDOW: u32 = 0x08000000;
+            cmd.creation_flags(CREATE_NO_WINDOW);
+        }
+
+        let mut child = match cmd.spawn()
         {
             Ok(child) => {
                 log::info!("FFmpeg process started with PID: {:?}", child.id());
