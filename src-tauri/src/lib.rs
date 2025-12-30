@@ -2,14 +2,116 @@ use futures_util::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use socket2::{Domain, Socket, Type};
 use std::collections::HashMap;
+use std::env;
+use std::fs;
 use std::io::Read;
 use std::net::SocketAddr;
+use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::sync::Arc;
 use tauri::State;
 use tokio::net::TcpListener;
 use tokio::sync::{broadcast, RwLock};
 use tokio_tungstenite::tungstenite::Message;
+
+// Find FFmpeg executable - searches common Windows locations
+fn find_ffmpeg() -> String {
+    // Check environment variable first
+    if let Ok(path) = env::var("FFMPEG_PATH") {
+        if std::path::Path::new(&path).exists() {
+            log::info!("Using FFmpeg from FFMPEG_PATH: {}", path);
+            return path;
+        }
+    }
+
+    // Check if ffmpeg is in PATH
+    if let Ok(output) = Command::new("ffmpeg").arg("-version").output() {
+        if output.status.success() {
+            log::info!("Using FFmpeg from PATH");
+            return "ffmpeg".to_string();
+        }
+    }
+
+    // Common Windows locations
+    let home = dirs::home_dir().unwrap_or_default();
+    let paths = vec![
+        home.join("AppData/Local/Microsoft/WinGet/Links/ffmpeg.exe"),
+        PathBuf::from("C:/ffmpeg/bin/ffmpeg.exe"),
+        PathBuf::from("C:/Program Files/ffmpeg/bin/ffmpeg.exe"),
+        home.join("scoop/apps/ffmpeg/current/bin/ffmpeg.exe"),
+    ];
+
+    // Search WinGet packages folder
+    let winget_base = home.join("AppData/Local/Microsoft/WinGet/Packages");
+    if winget_base.exists() {
+        if let Ok(entries) = fs::read_dir(&winget_base) {
+            for entry in entries.flatten() {
+                let dir_name = entry.file_name().to_string_lossy().to_lowercase();
+                if dir_name.contains("ffmpeg") {
+                    if let Some(found) = search_ffmpeg_in_dir(&entry.path(), 0) {
+                        log::info!("Found FFmpeg in WinGet: {}", found.display());
+                        return found.to_string_lossy().to_string();
+                    }
+                }
+            }
+        }
+    }
+
+    // Check common paths
+    for path in paths {
+        if path.exists() {
+            log::info!("Found FFmpeg at: {}", path.display());
+            return path.to_string_lossy().to_string();
+        }
+    }
+
+    log::warn!("FFmpeg not found, using 'ffmpeg' as fallback");
+    "ffmpeg".to_string()
+}
+
+// Recursively search for ffmpeg.exe in a directory
+fn search_ffmpeg_in_dir(dir: &std::path::Path, depth: u32) -> Option<PathBuf> {
+    if depth > 3 {
+        return None;
+    }
+
+    let entries: Vec<_> = fs::read_dir(dir).ok()?.flatten().collect();
+
+    // First check files in current directory
+    for entry in &entries {
+        let path = entry.path();
+        if path.is_file() {
+            if let Some(name) = path.file_name() {
+                if name.to_string_lossy().to_lowercase() == "ffmpeg.exe" {
+                    return Some(path);
+                }
+            }
+        }
+    }
+
+    // Then recurse into subdirectories
+    for entry in &entries {
+        let path = entry.path();
+        if path.is_dir() {
+            if let Some(name) = path.file_name() {
+                if !name.to_string_lossy().starts_with('.') {
+                    if let Some(found) = search_ffmpeg_in_dir(&path, depth + 1) {
+                        return Some(found);
+                    }
+                }
+            }
+        }
+    }
+
+    None
+}
+
+// Get FFmpeg path (cached)
+fn get_ffmpeg_path() -> String {
+    use std::sync::OnceLock;
+    static FFMPEG_PATH: OnceLock<String> = OnceLock::new();
+    FFMPEG_PATH.get_or_init(find_ffmpeg).clone()
+}
 
 // Stream state management
 #[derive(Default)]
@@ -145,9 +247,17 @@ async fn get_active_streams(
 // Check if FFmpeg is available
 #[tauri::command]
 async fn check_ffmpeg() -> Result<bool, String> {
-    match Command::new("ffmpeg").arg("-version").output() {
-        Ok(output) => Ok(output.status.success()),
-        Err(_) => Ok(false),
+    let ffmpeg_path = get_ffmpeg_path();
+    log::info!("Checking FFmpeg at: {}", ffmpeg_path);
+    match Command::new(&ffmpeg_path).arg("-version").output() {
+        Ok(output) => {
+            log::info!("FFmpeg check result: {}", output.status.success());
+            Ok(output.status.success())
+        }
+        Err(e) => {
+            log::error!("FFmpeg check error: {}", e);
+            Ok(false)
+        }
     }
 }
 
@@ -179,10 +289,11 @@ async fn run_stream_server(
     let rtsp_url_clone = rtsp_url.clone();
 
     // FFmpeg runner task - use spawn_blocking for blocking I/O
+    let ffmpeg_path = get_ffmpeg_path();
     let ffmpeg_task = tokio::task::spawn_blocking(move || {
-        log::info!("Starting FFmpeg for RTSP URL: {}", rtsp_url_clone);
+        log::info!("Starting FFmpeg ({}) for RTSP URL: {}", ffmpeg_path, rtsp_url_clone);
 
-        let mut child = match Command::new("ffmpeg")
+        let mut child = match Command::new(&ffmpeg_path)
             .args([
                 "-rtsp_transport", "tcp",      // Use TCP for RTSP (more reliable)
                 "-fflags", "nobuffer",         // Reduce buffering
