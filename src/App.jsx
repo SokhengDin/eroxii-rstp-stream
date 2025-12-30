@@ -8,13 +8,10 @@ const isTauri = typeof window !== 'undefined' && window.__TAURI_INTERNALS__;
 // API base URL for Node.js server (browser mode)
 const API_BASE = 'http://127.0.0.1:3001';
 
-// Dynamic import for Tauri API (only when running in Tauri)
-let invoke = null;
-if (isTauri) {
-  import('@tauri-apps/api/core').then((module) => {
-    invoke = module.invoke;
-  });
-}
+// Promise that resolves with invoke function when Tauri is ready
+const tauriInvokePromise = isTauri
+  ? import('@tauri-apps/api/core').then((module) => module.invoke)
+  : Promise.resolve(null);
 
 // Cameras per page (2x2 grid)
 const CAMERAS_PER_PAGE = 4;
@@ -83,6 +80,7 @@ function App() {
 
   const checkFfmpeg = async () => {
     try {
+      const invoke = await tauriInvokePromise;
       if (isTauri && invoke) {
         const available = await invoke('check_ffmpeg');
         setFfmpegAvailable(available);
@@ -100,6 +98,7 @@ function App() {
   const startStream = async (camera) => {
     try {
       let response;
+      const invoke = await tauriInvokePromise;
       if (isTauri && invoke) {
         response = await invoke('start_stream', {
           rtspUrl: camera.rtspUrl,
@@ -132,6 +131,7 @@ function App() {
 
   const stopStream = async (camera) => {
     try {
+      const invoke = await tauriInvokePromise;
       if (isTauri && invoke) {
         await invoke('stop_stream', { wsPort: camera.wsPort });
       } else {
