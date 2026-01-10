@@ -165,7 +165,7 @@ export default function RTSPPlayer({ wsUrl, width = 640, height = 480 }) {
         ref={canvasRef}
         width={width}
         height={height}
-        className="absolute inset-0 w-full h-full object-contain"
+        className="absolute inset-0 w-full h-full object-cover"
       />
 
       {/* Error Overlay */}
