@@ -140,7 +140,7 @@ export default function RTSPPlayer({ wsUrl, width = 640, height = 480 }) {
   };
 
   return (
-    <div className="relative w-full h-full flex flex-col">
+    <div className="absolute inset-0">
       {/* Stats Overlay */}
       <div className="absolute top-1 left-1 right-1 z-10 flex items-center justify-between">
         <div className="flex items-center gap-1 bg-black/60 backdrop-blur-sm px-1.5 py-0.5 rounded text-[10px]">
@@ -165,7 +165,7 @@ export default function RTSPPlayer({ wsUrl, width = 640, height = 480 }) {
         ref={canvasRef}
         width={width}
         height={height}
-        className="w-full h-full object-contain"
+        className="absolute inset-0 w-full h-full object-contain"
       />
 
       {/* Error Overlay */}
