@@ -2,5 +2,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-    eroxii_rstp_stream_lib::run()
+    eroxii_camera_lib::run()
 }
