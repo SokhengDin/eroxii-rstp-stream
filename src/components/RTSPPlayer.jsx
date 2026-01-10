@@ -142,19 +142,19 @@ export default function RTSPPlayer({ wsUrl, width = 640, height = 480 }) {
   return (
     <div className="relative w-full h-full flex flex-col">
       {/* Stats Overlay */}
-      <div className="absolute top-3 left-3 right-3 z-10 flex items-center justify-between">
-        <div className="flex items-center gap-2 bg-black/70 backdrop-blur-sm px-3 py-1.5 rounded-lg">
+      <div className="absolute top-1 left-1 right-1 z-10 flex items-center justify-between">
+        <div className="flex items-center gap-1 bg-black/60 backdrop-blur-sm px-1.5 py-0.5 rounded text-[10px]">
           <span
-            className="w-2 h-2 rounded-full"
+            className="w-1.5 h-1.5 rounded-full"
             style={{ backgroundColor: getStatusColor() }}
           />
-          <span className="text-white text-xs font-medium">{status}</span>
+          <span className="text-white font-medium">{status}</span>
         </div>
-        <div className="flex items-center gap-3 bg-black/70 backdrop-blur-sm px-3 py-1.5 rounded-lg">
-          <span className="text-white text-xs">
+        <div className="flex items-center gap-2 bg-black/60 backdrop-blur-sm px-1.5 py-0.5 rounded text-[10px]">
+          <span className="text-white">
             <span className="font-medium">Frames:</span> {frameCount.toLocaleString()}
           </span>
-          <span className="text-white text-xs">
+          <span className="text-white">
             <span className="font-medium">FPS:</span> {fps}
           </span>
         </div>
@@ -170,7 +170,7 @@ export default function RTSPPlayer({ wsUrl, width = 640, height = 480 }) {
 
       {/* Error Overlay */}
       {error && (
-        <div className="absolute bottom-3 left-3 right-3 bg-red-500/90 backdrop-blur-sm text-white px-3 py-2 rounded-lg text-xs">
+        <div className="absolute bottom-1 left-1 right-1 bg-red-500/90 backdrop-blur-sm text-white px-1.5 py-0.5 rounded text-[10px]">
           {error}
         </div>
       )}
