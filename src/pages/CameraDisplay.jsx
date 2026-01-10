@@ -318,38 +318,38 @@ function CameraDisplay() {
         {/* 2x2 Camera Grid - Fixed 2x2 layout */}
         <div className={`flex-1 grid min-h-0 overflow-hidden ${isFullscreen ? 'gap-0' : 'gap-3'}`} style={{ gridTemplateColumns: '1fr 1fr', gridTemplateRows: '1fr 1fr' }}>
           {getCurrentPageCameras().map((camera) => (
-            <div key={camera.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm flex flex-col min-h-0 max-h-full">
-              <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-200 flex-shrink-0">
-                <h3 className="font-semibold text-gray-900 text-sm">{camera.name}</h3>
-                <div className="flex items-center gap-2">
+            <div key={camera.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm flex flex-col min-h-0 min-w-0">
+              <div className="flex items-center justify-between px-2 py-1 border-b border-gray-200 flex-shrink-0">
+                <h3 className="font-medium text-gray-900 text-xs truncate">{camera.name}</h3>
+                <div className="flex items-center gap-1">
                   {!camera.active ? (
                     <button
                       onClick={() => startStream(camera)}
                       disabled={!ffmpegAvailable}
-                      className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                      className="p-1 text-green-600 hover:bg-green-50 rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                       title="Start stream"
                     >
-                      <Play className="w-4 h-4" />
+                      <Play className="w-3 h-3" />
                     </button>
                   ) : (
                     <button
                       onClick={() => stopStream(camera)}
-                      className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
                       title="Stop stream"
                     >
-                      <Square className="w-4 h-4" />
+                      <Square className="w-3 h-3" />
                     </button>
                   )}
                   <button
                     onClick={() => removeCamera(camera)}
-                    className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                    className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
                     title="Remove camera"
                   >
-                    <X className="w-4 h-4" />
+                    <X className="w-3 h-3" />
                   </button>
                 </div>
               </div>
-              <div className="flex-1 bg-gray-900 relative overflow-hidden min-h-0">
+              <div className="flex-1 bg-gray-900 relative overflow-hidden min-h-0 max-h-full">
                 {camera.active && camera.wsUrl ? (
                   <RTSPPlayer
                     wsUrl={camera.wsUrl}
@@ -377,7 +377,7 @@ function CameraDisplay() {
               <button
                 key={`empty-${i}`}
                 onClick={() => setShowAddForm(true)}
-                className="border-2 border-dashed border-gray-300 rounded-xl bg-white hover:border-blue-400 hover:bg-blue-50 transition-all flex items-center justify-center group min-h-0 max-h-full"
+                className="border-2 border-dashed border-gray-300 rounded-xl bg-white hover:border-blue-400 hover:bg-blue-50 transition-all flex items-center justify-center group min-h-0 min-w-0"
               >
                 <div className="text-center">
                   <div className="w-12 h-12 rounded-full bg-gray-100 group-hover:bg-blue-100 flex items-center justify-center mx-auto mb-3 transition-colors">
