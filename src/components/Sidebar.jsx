@@ -27,7 +27,7 @@ const Sidebar = ({ currentPage, onPageChange }) => {
     <div className={`bg-white border-r border-gray-200 h-screen flex flex-col transition-all duration-300 ${isExpanded ? 'w-64' : 'w-20'}`}>
       {/* Logo Section */}
       <div className="p-6 flex items-center gap-3 border-b border-gray-200">
-        <div className="w-10 h-10 rounded-xl bg-blue-500 flex items-center justify-center flex-shrink-0 shadow-sm">
+        <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm">
           <img src="/images/logo.png" alt="eRoxii" className="w-7 h-7 object-contain" />
         </div>
         {isExpanded && (

@@ -91,7 +91,7 @@ function CameraDisplay() {
       }
     } catch (err) {
       setFfmpegAvailable(false);
-      setStatus(isTauri ? `Error: ${err}` : 'Cannot connect to server. Run: npm run server');
+      // Silently fail - no error message shown
     }
   };
 
@@ -203,10 +203,13 @@ function CameraDisplay() {
 
   return (
     <div className="flex-1 flex flex-col bg-gray-50">
-      {/* Compact Control Bar */}
-      <div className="bg-white border-b border-gray-200 px-6 py-3 flex-shrink-0">
-        <div className="flex items-center justify-between gap-4">
-          {/* Left: Tab Navigation & Page Controls */}
+      {/* Header */}
+      <div className="bg-white border-b border-gray-200 px-8 py-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Camera Display</h1>
+            <p className="text-sm text-gray-500 mt-1">Manage and monitor RTSP camera streams</p>
+          </div>
           <div className="flex items-center gap-3">
             {/* Tab Navigation */}
             {totalTabs > 1 && (
@@ -215,7 +218,7 @@ function CameraDisplay() {
                   <button
                     key={i}
                     onClick={() => setCurrentTab(i)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                       currentTab === i
                         ? 'bg-blue-500 text-white shadow-sm'
                         : 'text-gray-600 hover:bg-gray-100 border border-gray-200'
@@ -227,65 +230,63 @@ function CameraDisplay() {
               </div>
             )}
 
-            {/* Page Controls */}
+            {/* FFmpeg Status */}
+            <div className={`flex items-center gap-2 px-4 py-2 rounded-lg border ${
+              ffmpegAvailable
+                ? 'bg-green-50 border-green-200 text-green-700'
+                : 'bg-red-50 border-red-200 text-red-700'
+            }`}>
+              {ffmpegAvailable ? (
+                <CheckCircle className="w-4 h-4" />
+              ) : (
+                <XCircle className="w-4 h-4" />
+              )}
+              <span className="text-sm font-medium">
+                FFmpeg {ffmpegAvailable === null ? '...' : ffmpegAvailable ? 'Ready' : 'Not Found'}
+              </span>
+            </div>
+
+            {/* Start/Stop All Buttons */}
             {cameras.length > 0 && (
               <>
-                <div className="w-px h-6 bg-gray-200" />
                 <button
                   onClick={startAllOnPage}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-green-600 hover:bg-green-50 rounded-lg transition-colors text-xs font-medium"
+                  className="flex items-center gap-2 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors font-medium shadow-sm"
                 >
-                  <Play className="w-3.5 h-3.5" />
+                  <Play className="w-4 h-4" />
                   <span>Start All</span>
                 </button>
                 <button
                   onClick={stopAllOnPage}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors text-xs font-medium"
+                  className="flex items-center gap-2 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors font-medium shadow-sm"
                 >
-                  <Square className="w-3.5 h-3.5" />
+                  <Square className="w-4 h-4" />
                   <span>Stop All</span>
                 </button>
               </>
             )}
-          </div>
 
-          {/* Right: FFmpeg Status & Add Camera */}
-          <div className="flex items-center gap-3">
-            <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg ${
-              ffmpegAvailable
-                ? 'bg-green-50 text-green-700'
-                : 'bg-red-50 text-red-700'
-            }`}>
-              {ffmpegAvailable ? (
-                <CheckCircle className="w-3.5 h-3.5" />
-              ) : (
-                <XCircle className="w-3.5 h-3.5" />
-              )}
-              <span className="text-xs font-medium">
-                FFmpeg {ffmpegAvailable === null ? '...' : ffmpegAvailable ? 'Ready' : 'Not Found'}
-              </span>
-            </div>
+            {/* Add Camera Button */}
             <button
               onClick={() => setShowAddForm(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-xs font-medium"
+              className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors font-medium shadow-sm"
             >
-              <Plus className="w-3.5 h-3.5" />
+              <Plus className="w-4 h-4" />
               <span>Add Camera</span>
             </button>
           </div>
         </div>
-
-        {/* Status Message */}
-        {status && (
-          <div className="mt-2 flex items-center gap-2 px-3 py-2 bg-blue-50 border border-blue-200 text-blue-800 rounded-lg">
-            <Info className="w-4 h-4 flex-shrink-0" />
-            <span className="text-xs">{status}</span>
-          </div>
-        )}
       </div>
 
-      {/* Camera Grid - Maximum Space */}
-      <div className="flex-1 flex flex-col overflow-hidden p-4">
+      {/* Camera Grid Content */}
+      <div className="flex-1 flex flex-col overflow-hidden p-6">
+        {/* Status Message */}
+        {status && (
+          <div className="mb-4 flex items-center gap-3 px-4 py-3 bg-blue-50 border border-blue-200 text-blue-800 rounded-lg">
+            <Info className="w-5 h-5 flex-shrink-0" />
+            <span className="text-sm">{status}</span>
+          </div>
+        )}
 
         {/* 2x2 Camera Grid - Fixed 2x2 layout */}
         <div className="flex-1 grid grid-cols-2 grid-rows-2 gap-3 min-h-0 overflow-hidden">

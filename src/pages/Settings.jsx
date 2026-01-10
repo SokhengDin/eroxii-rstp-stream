@@ -210,18 +210,6 @@ function Settings() {
                   <span className="text-sm font-semibold text-gray-900">1.0.0</span>
                 </div>
               </div>
-              <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                <div className="flex flex-col">
-                  <span className="text-xs text-gray-500 mb-1">Framework</span>
-                  <span className="text-sm font-semibold text-gray-900">Tauri v2 + React 19</span>
-                </div>
-              </div>
-              <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                <div className="flex flex-col">
-                  <span className="text-xs text-gray-500 mb-1">WebSocket Server</span>
-                  <span className="text-sm font-semibold text-gray-900">Port 9900</span>
-                </div>
-              </div>
             </div>
           </div>
         </div>
