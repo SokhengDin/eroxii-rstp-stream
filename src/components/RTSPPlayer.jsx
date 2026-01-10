@@ -140,31 +140,40 @@ export default function RTSPPlayer({ wsUrl, width = 640, height = 480 }) {
   };
 
   return (
-    <div className="rtsp-player">
-      <div className="player-stats">
-        <div className="player-status">
+    <div className="relative w-full h-full flex flex-col">
+      {/* Stats Overlay */}
+      <div className="absolute top-3 left-3 right-3 z-10 flex items-center justify-between">
+        <div className="flex items-center gap-2 bg-black/70 backdrop-blur-sm px-3 py-1.5 rounded-lg">
           <span
-            className="status-dot"
+            className="w-2 h-2 rounded-full"
             style={{ backgroundColor: getStatusColor() }}
           />
-          <span className="status-text">{status}</span>
+          <span className="text-white text-xs font-medium">{status}</span>
         </div>
-        <div className="frame-stats">
-          <span className="stat-item">
-            <strong>Frames:</strong> {frameCount.toLocaleString()}
+        <div className="flex items-center gap-3 bg-black/70 backdrop-blur-sm px-3 py-1.5 rounded-lg">
+          <span className="text-white text-xs">
+            <span className="font-medium">Frames:</span> {frameCount.toLocaleString()}
           </span>
-          <span className="stat-item">
-            <strong>FPS:</strong> {fps}
+          <span className="text-white text-xs">
+            <span className="font-medium">FPS:</span> {fps}
           </span>
         </div>
       </div>
+
+      {/* Video Canvas - Full Size */}
       <canvas
         ref={canvasRef}
         width={width}
         height={height}
-        className="video-canvas"
+        className="w-full h-full object-contain"
       />
-      {error && <div className="player-error">{error}</div>}
+
+      {/* Error Overlay */}
+      {error && (
+        <div className="absolute bottom-3 left-3 right-3 bg-red-500/90 backdrop-blur-sm text-white px-3 py-2 rounded-lg text-xs">
+          {error}
+        </div>
+      )}
     </div>
   );
 }

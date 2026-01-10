@@ -203,94 +203,94 @@ function CameraDisplay() {
 
   return (
     <div className="flex-1 flex flex-col bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-8 py-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Camera Display</h1>
-            <p className="text-sm text-gray-500 mt-1">Manage and monitor RTSP camera streams</p>
-          </div>
+      {/* Compact Control Bar */}
+      <div className="bg-white border-b border-gray-200 px-6 py-3 flex-shrink-0">
+        <div className="flex items-center justify-between gap-4">
+          {/* Left: Tab Navigation & Page Controls */}
           <div className="flex items-center gap-3">
-            <div className={`flex items-center gap-2 px-4 py-2 rounded-lg border ${
+            {/* Tab Navigation */}
+            {totalTabs > 1 && (
+              <div className="flex gap-2">
+                {Array.from({ length: totalTabs }, (_, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setCurrentTab(i)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                      currentTab === i
+                        ? 'bg-blue-500 text-white shadow-sm'
+                        : 'text-gray-600 hover:bg-gray-100 border border-gray-200'
+                    }`}
+                  >
+                    Page {i + 1}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Page Controls */}
+            {cameras.length > 0 && (
+              <>
+                <div className="w-px h-6 bg-gray-200" />
+                <button
+                  onClick={startAllOnPage}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-green-600 hover:bg-green-50 rounded-lg transition-colors text-xs font-medium"
+                >
+                  <Play className="w-3.5 h-3.5" />
+                  <span>Start All</span>
+                </button>
+                <button
+                  onClick={stopAllOnPage}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors text-xs font-medium"
+                >
+                  <Square className="w-3.5 h-3.5" />
+                  <span>Stop All</span>
+                </button>
+              </>
+            )}
+          </div>
+
+          {/* Right: FFmpeg Status & Add Camera */}
+          <div className="flex items-center gap-3">
+            <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg ${
               ffmpegAvailable
-                ? 'bg-green-50 border-green-200 text-green-700'
-                : 'bg-red-50 border-red-200 text-red-700'
+                ? 'bg-green-50 text-green-700'
+                : 'bg-red-50 text-red-700'
             }`}>
               {ffmpegAvailable ? (
-                <CheckCircle className="w-4 h-4" />
+                <CheckCircle className="w-3.5 h-3.5" />
               ) : (
-                <XCircle className="w-4 h-4" />
+                <XCircle className="w-3.5 h-3.5" />
               )}
-              <span className="text-sm font-medium">
+              <span className="text-xs font-medium">
                 FFmpeg {ffmpegAvailable === null ? '...' : ffmpegAvailable ? 'Ready' : 'Not Found'}
               </span>
             </div>
             <button
               onClick={() => setShowAddForm(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors shadow-sm"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-xs font-medium"
             >
-              <Plus className="w-4 h-4" />
-              <span className="font-medium">Add Camera</span>
+              <Plus className="w-3.5 h-3.5" />
+              <span>Add Camera</span>
             </button>
           </div>
         </div>
+
+        {/* Status Message */}
+        {status && (
+          <div className="mt-2 flex items-center gap-2 px-3 py-2 bg-blue-50 border border-blue-200 text-blue-800 rounded-lg">
+            <Info className="w-4 h-4 flex-shrink-0" />
+            <span className="text-xs">{status}</span>
+          </div>
+        )}
       </div>
 
-      <div className="flex-1 flex flex-col overflow-hidden p-6">
-        {/* Status bar */}
-        {status && (
-          <div className="mb-3 flex items-center gap-3 px-4 py-3 bg-blue-50 border border-blue-200 text-blue-800 rounded-lg">
-            <Info className="w-5 h-5 flex-shrink-0" />
-            <span className="text-sm">{status}</span>
-          </div>
-        )}
+      {/* Camera Grid - Maximum Space */}
+      <div className="flex-1 flex flex-col overflow-hidden p-4">
 
-        {/* Tab Navigation */}
-        {totalTabs > 1 && (
-          <div className="flex gap-2 mb-3">
-            {Array.from({ length: totalTabs }, (_, i) => (
-              <button
-                key={i}
-                onClick={() => setCurrentTab(i)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                  currentTab === i
-                    ? 'bg-white text-blue-600 shadow-sm border border-gray-200'
-                    : 'text-gray-600 hover:bg-white hover:shadow-sm border border-transparent'
-                }`}
-              >
-                Page {i + 1}
-                <span className="ml-2 text-xs opacity-70">
-                  ({Math.min(CAMERAS_PER_PAGE, cameras.length - i * CAMERAS_PER_PAGE)})
-                </span>
-              </button>
-            ))}
-          </div>
-        )}
-
-        {/* Page Controls */}
-        {cameras.length > 0 && (
-          <div className="flex gap-3 mb-3">
-            <button
-              onClick={startAllOnPage}
-              className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg hover:border-green-300 hover:bg-green-50 hover:text-green-700 transition-colors"
-            >
-              <Play className="w-4 h-4" />
-              <span className="font-medium">Start All</span>
-            </button>
-            <button
-              onClick={stopAllOnPage}
-              className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg hover:border-red-300 hover:bg-red-50 hover:text-red-700 transition-colors"
-            >
-              <Square className="w-4 h-4" />
-              <span className="font-medium">Stop All</span>
-            </button>
-          </div>
-        )}
-
-        {/* 2x2 Camera Grid - Auto-fit to available height */}
-        <div className="flex-1 grid grid-cols-2 grid-rows-2 gap-3 min-h-0">
+        {/* 2x2 Camera Grid - Fixed 2x2 layout */}
+        <div className="flex-1 grid grid-cols-2 grid-rows-2 gap-3 min-h-0 overflow-hidden">
           {getCurrentPageCameras().map((camera) => (
-            <div key={camera.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm flex flex-col min-h-0">
+            <div key={camera.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm flex flex-col min-h-0 h-full">
               <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-200 flex-shrink-0">
                 <h3 className="font-semibold text-gray-900 text-sm">{camera.name}</h3>
                 <div className="flex items-center gap-2">
@@ -321,20 +321,22 @@ function CameraDisplay() {
                   </button>
                 </div>
               </div>
-              <div className="flex-1 bg-gray-900 flex items-center justify-center min-h-0">
+              <div className="flex-1 bg-gray-900 relative overflow-hidden min-h-0">
                 {camera.active && camera.wsUrl ? (
                   <RTSPPlayer
                     wsUrl={camera.wsUrl}
-                    width={640}
-                    height={360}
+                    width={1920}
+                    height={1080}
                   />
                 ) : (
-                  <div className="text-center px-6">
-                    <div className="w-12 h-12 rounded-full bg-gray-800 flex items-center justify-center mx-auto mb-3">
-                      <Play className="w-6 h-6 text-gray-500" />
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="text-center px-6">
+                      <div className="w-12 h-12 rounded-full bg-gray-800 flex items-center justify-center mx-auto mb-3">
+                        <Play className="w-6 h-6 text-gray-500" />
+                      </div>
+                      <p className="text-gray-400 font-medium mb-1 text-sm">{camera.name}</p>
+                      <p className="text-xs text-gray-600 break-all line-clamp-2">{camera.rtspUrl}</p>
                     </div>
-                    <p className="text-gray-400 font-medium mb-1 text-sm">{camera.name}</p>
-                    <p className="text-xs text-gray-600 break-all line-clamp-2">{camera.rtspUrl}</p>
                   </div>
                 )}
               </div>
@@ -347,7 +349,7 @@ function CameraDisplay() {
               <button
                 key={`empty-${i}`}
                 onClick={() => setShowAddForm(true)}
-                className="border-2 border-dashed border-gray-300 rounded-xl bg-white hover:border-blue-400 hover:bg-blue-50 transition-all flex items-center justify-center group min-h-0"
+                className="border-2 border-dashed border-gray-300 rounded-xl bg-white hover:border-blue-400 hover:bg-blue-50 transition-all flex items-center justify-center group min-h-0 h-full"
               >
                 <div className="text-center">
                   <div className="w-12 h-12 rounded-full bg-gray-100 group-hover:bg-blue-100 flex items-center justify-center mx-auto mb-3 transition-colors">
