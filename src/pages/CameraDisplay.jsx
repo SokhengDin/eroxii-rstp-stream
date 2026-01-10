@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Play, Square, X, CheckCircle, XCircle, Info } from 'lucide-react';
+import { Plus, Play, Square, X, CheckCircle, XCircle, Info, Maximize, Minimize } from 'lucide-react';
 import RTSPPlayer from '../components/RTSPPlayer';
 
 // Detect if running in Tauri
@@ -50,6 +50,7 @@ function CameraDisplay() {
   const [currentTab, setCurrentTab] = useState(0);
   const [ffmpegAvailable, setFfmpegAvailable] = useState(null);
   const [status, setStatus] = useState('');
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   // Form state for adding new camera
   const [newCamera, setNewCamera] = useState({
@@ -203,8 +204,9 @@ function CameraDisplay() {
 
   return (
     <div className="flex-1 flex flex-col bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-8 py-6">
+      {/* Header - Hidden in fullscreen */}
+      {!isFullscreen && (
+        <div className="bg-white border-b border-gray-200 px-8 py-6">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Camera Display</h1>
@@ -274,14 +276,39 @@ function CameraDisplay() {
               <Plus className="w-4 h-4" />
               <span>Add Camera</span>
             </button>
+
+            {/* Fullscreen Toggle Button */}
+            <button
+              onClick={() => setIsFullscreen(!isFullscreen)}
+              className="flex items-center gap-2 px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-800 transition-colors font-medium shadow-sm"
+              title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
+            >
+              {isFullscreen ? (
+                <Minimize className="w-4 h-4" />
+              ) : (
+                <Maximize className="w-4 h-4" />
+              )}
+            </button>
           </div>
         </div>
-      </div>
+        </div>
+      )}
+
+      {/* Fullscreen Exit Button - Only visible in fullscreen */}
+      {isFullscreen && (
+        <button
+          onClick={() => setIsFullscreen(false)}
+          className="absolute top-4 right-4 z-50 flex items-center gap-2 px-4 py-2 bg-gray-900/80 backdrop-blur-sm text-white rounded-lg hover:bg-gray-900 transition-colors font-medium shadow-lg"
+        >
+          <Minimize className="w-4 h-4" />
+          <span>Exit Fullscreen</span>
+        </button>
+      )}
 
       {/* Camera Grid Content */}
-      <div className="flex-1 flex flex-col overflow-hidden p-6">
-        {/* Status Message */}
-        {status && (
+      <div className={`flex-1 flex flex-col overflow-hidden ${isFullscreen ? 'p-0' : 'p-6'}`}>
+        {/* Status Message - Hidden in fullscreen */}
+        {status && !isFullscreen && (
           <div className="mb-4 flex items-center gap-3 px-4 py-3 bg-blue-50 border border-blue-200 text-blue-800 rounded-lg">
             <Info className="w-5 h-5 flex-shrink-0" />
             <span className="text-sm">{status}</span>
@@ -289,9 +316,9 @@ function CameraDisplay() {
         )}
 
         {/* 2x2 Camera Grid - Fixed 2x2 layout */}
-        <div className="flex-1 grid grid-cols-2 grid-rows-2 gap-3 min-h-0 overflow-hidden">
+        <div className={`flex-1 grid min-h-0 overflow-hidden ${isFullscreen ? 'gap-0' : 'gap-3'}`} style={{ gridTemplateColumns: '1fr 1fr', gridTemplateRows: '1fr 1fr' }}>
           {getCurrentPageCameras().map((camera) => (
-            <div key={camera.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm flex flex-col min-h-0 h-full">
+            <div key={camera.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm flex flex-col min-h-0 max-h-full">
               <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-200 flex-shrink-0">
                 <h3 className="font-semibold text-gray-900 text-sm">{camera.name}</h3>
                 <div className="flex items-center gap-2">
@@ -350,7 +377,7 @@ function CameraDisplay() {
               <button
                 key={`empty-${i}`}
                 onClick={() => setShowAddForm(true)}
-                className="border-2 border-dashed border-gray-300 rounded-xl bg-white hover:border-blue-400 hover:bg-blue-50 transition-all flex items-center justify-center group min-h-0 h-full"
+                className="border-2 border-dashed border-gray-300 rounded-xl bg-white hover:border-blue-400 hover:bg-blue-50 transition-all flex items-center justify-center group min-h-0 max-h-full"
               >
                 <div className="text-center">
                   <div className="w-12 h-12 rounded-full bg-gray-100 group-hover:bg-blue-100 flex items-center justify-center mx-auto mb-3 transition-colors">
