@@ -5,8 +5,8 @@ import RTSPPlayer from '../components/RTSPPlayer';
 // Detect if running in Tauri
 const isTauri = typeof window !== 'undefined' && window.__TAURI_INTERNALS__;
 
-// API base URL for Node.js server (browser mode)
-const API_BASE = 'http://127.0.0.1:3001';
+// API base URL: empty string = same origin (Docker/web via serve.js), or direct node port for Tauri/dev
+const API_BASE = isTauri ? 'http://127.0.0.1:3001' : '';
 
 // Promise that resolves with invoke function when Tauri is ready
 const tauriInvokePromise = isTauri
