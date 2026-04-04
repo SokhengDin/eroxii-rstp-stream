@@ -9,6 +9,19 @@ import { WebSocketServer } from 'ws';
 import { spawn } from 'child_process';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+import net from 'net';
+
+function isPortInUse(port) {
+  return new Promise((resolve) => {
+    const server = net.createServer();
+    server.once('error', () => resolve(true));
+    server.once('listening', () => {
+      server.close();
+      resolve(false);
+    });
+    server.listen(port);
+  });
+}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -64,8 +77,16 @@ app.post('/api/start-stream', (req, res) => {
     });
   }
 
-  const result = startStream(rtspUrl, wsPort, req.hostname);
-  res.json(result);
+  isPortInUse(wsPort).then((inUse) => {
+    if (inUse) {
+      return res.json({
+        success: false,
+        message: `Port ${wsPort} is already in use by another process`
+      });
+    }
+    const result = startStream(rtspUrl, wsPort, req.hostname);
+    res.json(result);
+  });
 });
 
 // API: Stop stream
