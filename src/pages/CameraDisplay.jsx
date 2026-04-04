@@ -13,8 +13,16 @@ const tauriInvokePromise = isTauri
   ? import('@tauri-apps/api/core').then((module) => module.invoke)
   : Promise.resolve(null);
 
-// Cameras per page (2x2 grid)
-const CAMERAS_PER_PAGE = 4;
+// Max cameras per page
+const CAMERAS_PER_PAGE = 9;
+
+// Dynamic grid columns based on camera count
+const getGridCols = (count) => {
+  if (count <= 1) return 1;
+  if (count <= 2) return 2;
+  if (count <= 4) return 2;
+  return 3;
+};
 
 // Starting port for WebSocket connections
 const BASE_WS_PORT = 9900;
@@ -315,8 +323,8 @@ function CameraDisplay() {
           </div>
         )}
 
-        {/* 2x2 Camera Grid - Fixed 2x2 layout */}
-        <div className={`flex-1 grid min-h-0 overflow-hidden ${isFullscreen ? 'gap-0' : 'gap-3'}`} style={{ gridTemplateColumns: '1fr 1fr', gridTemplateRows: '1fr 1fr' }}>
+        {/* Dynamic Camera Grid */}
+        <div className={`flex-1 grid min-h-0 overflow-hidden ${isFullscreen ? 'gap-0' : 'gap-3'}`} style={{ gridTemplateColumns: `repeat(${getGridCols(getCurrentPageCameras().length)}, 1fr)`, gridAutoRows: '1fr' }}>
           {getCurrentPageCameras().map((camera) => (
             <div key={camera.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm flex flex-col min-h-0 min-w-0">
               <div className="flex items-center justify-between px-2 py-1 border-b border-gray-200 flex-shrink-0">
@@ -390,7 +398,6 @@ function CameraDisplay() {
           }
         </div>
       </div>
-
       {/* Add Camera Modal */}
       {showAddForm && (
         <div

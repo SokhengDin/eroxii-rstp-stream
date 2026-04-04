@@ -23,6 +23,23 @@ function isPortInUse(port) {
   });
 }
 
+const BASE_WS_PORT = 9900;
+const MAX_WS_PORT = 9910;
+
+async function findFreePort(requestedPort) {
+  // Try requested port first
+  if (!(await isPortInUse(requestedPort)) && !streams.has(requestedPort)) {
+    return requestedPort;
+  }
+  // Scan range for a free port
+  for (let port = BASE_WS_PORT; port <= MAX_WS_PORT; port++) {
+    if (!streams.has(port) && !(await isPortInUse(port))) {
+      return port;
+    }
+  }
+  return null;
+}
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
@@ -70,21 +87,14 @@ app.post('/api/start-stream', (req, res) => {
     });
   }
 
-  if (streams.has(wsPort)) {
-    return res.json({
-      success: false,
-      message: `Port ${wsPort} is already in use`
-    });
-  }
-
-  isPortInUse(wsPort).then((inUse) => {
-    if (inUse) {
+  findFreePort(wsPort).then((freePort) => {
+    if (freePort === null) {
       return res.json({
         success: false,
-        message: `Port ${wsPort} is already in use by another process`
+        message: `No free ports available in range ${BASE_WS_PORT}-${MAX_WS_PORT}`
       });
     }
-    const result = startStream(rtspUrl, wsPort, req.hostname);
+    const result = startStream(rtspUrl, freePort, req.hostname);
     res.json(result);
   });
 });
