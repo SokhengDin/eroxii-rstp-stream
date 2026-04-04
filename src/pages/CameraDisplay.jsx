@@ -379,23 +379,6 @@ function CameraDisplay() {
             </div>
           ))}
 
-          {/* Empty slots */}
-          {getCurrentPageCameras().length < CAMERAS_PER_PAGE &&
-            Array.from({ length: CAMERAS_PER_PAGE - getCurrentPageCameras().length }, (_, i) => (
-              <button
-                key={`empty-${i}`}
-                onClick={() => setShowAddForm(true)}
-                className="border-2 border-dashed border-gray-300 rounded-xl bg-white hover:border-blue-400 hover:bg-blue-50 transition-all flex items-center justify-center group min-h-0 min-w-0"
-              >
-                <div className="text-center">
-                  <div className="w-12 h-12 rounded-full bg-gray-100 group-hover:bg-blue-100 flex items-center justify-center mx-auto mb-3 transition-colors">
-                    <Plus className="w-6 h-6 text-gray-400 group-hover:text-blue-500 transition-colors" />
-                  </div>
-                  <p className="text-sm font-medium text-gray-500 group-hover:text-blue-600 transition-colors">Add Camera</p>
-                </div>
-              </button>
-            ))
-          }
         </div>
       </div>
       {/* Add Camera Modal */}
