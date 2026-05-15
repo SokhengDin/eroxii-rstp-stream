@@ -24,13 +24,9 @@ export default function WebRTCPlayer({ streamName, rtspUrl, active, onStop }) {
       setStatus('connecting');
       try {
         // Register stream in go2rtc
-        await fetch(`/api/go2rtc/api/streams?name=${encodeURIComponent(streamName)}`, {
+        await fetch(`/api/go2rtc/api/streams?name=${encodeURIComponent(streamName)}&src=${encodeURIComponent(rtspUrl)}`, {
           method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-session-token': localStorage.getItem('auth-token') || '',
-          },
-          body: JSON.stringify({ [streamName]: rtspUrl }),
+          headers: { 'x-session-token': localStorage.getItem('auth-token') || '' },
         });
 
         if (cancelled) return;
