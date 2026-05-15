@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Plus, Play, Square, X, CheckCircle, XCircle, Info, Maximize, Minimize } from 'lucide-react';
+import { Plus, Play, Square, X, CheckCircle, XCircle, Info, Maximize, Minimize, Radio } from 'lucide-react';
 import RTSPPlayer from '../components/RTSPPlayer';
+import WebRTCPlayer from '../components/WebRTCPlayer';
 import { apiFetch } from '../utils/api';
 
 // Detect if running in Tauri
@@ -60,6 +61,7 @@ function CameraDisplay() {
   const [ffmpegAvailable, setFfmpegAvailable] = useState(null);
   const [status, setStatus] = useState('');
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [mode, setMode] = useState(() => localStorage.getItem('stream-mode') || 'jsmpeg');
 
   // Form state for adding new camera
   const [newCamera, setNewCamera] = useState({
@@ -78,6 +80,11 @@ function CameraDisplay() {
     return cameras.slice(start, end);
   };
 
+  // Save mode to localStorage
+  useEffect(() => {
+    localStorage.setItem('stream-mode', mode);
+  }, [mode]);
+
   // Check FFmpeg on mount
   useEffect(() => {
     checkFfmpeg();
@@ -87,6 +94,33 @@ function CameraDisplay() {
   useEffect(() => {
     saveCameras(cameras);
   }, [cameras]);
+
+  // Register / update all cameras in go2rtc when switching to webrtc mode
+  useEffect(() => {
+    if (mode === 'webrtc') {
+      cameras.forEach(registerGo2rtcStream);
+    }
+  }, [mode]);
+
+  const go2rtcStreamName = (camera) => `cam_${camera.id}`;
+
+  const registerGo2rtcStream = async (camera) => {
+    try {
+      await apiFetch(`/api/go2rtc/api/streams?name=${encodeURIComponent(go2rtcStreamName(camera))}&src=${encodeURIComponent(camera.rtspUrl)}`, {
+        method: 'PUT',
+      });
+    } catch {
+      // go2rtc might not be running in local dev — silently ignore
+    }
+  };
+
+  const unregisterGo2rtcStream = async (camera) => {
+    try {
+      await apiFetch(`/api/go2rtc/api/streams?name=${encodeURIComponent(go2rtcStreamName(camera))}`, {
+        method: 'DELETE',
+      });
+    } catch {}
+  };
 
   const checkFfmpeg = async () => {
     try {
@@ -181,12 +215,12 @@ function CameraDisplay() {
     setNewCamera({ name: '', rtspUrl: '' });
     setShowAddForm(false);
     setStatus(`Added camera: ${camera.name}`);
+    if (mode === 'webrtc') registerGo2rtcStream(camera);
   };
 
   const removeCamera = async (camera) => {
-    if (camera.active) {
-      await stopStream(camera);
-    }
+    if (camera.active) await stopStream(camera);
+    await unregisterGo2rtcStream(camera);
     setCameras(prev => prev.filter(c => c.id !== camera.id));
     setStatus(`Removed: ${camera.name}`);
   };
@@ -239,21 +273,49 @@ function CameraDisplay() {
               </div>
             )}
 
-            {/* FFmpeg Status */}
-            <div className={`flex items-center gap-2 px-4 py-2 rounded-lg border ${
-              ffmpegAvailable
-                ? 'bg-green-50 border-green-200 text-green-700'
-                : 'bg-red-50 border-red-200 text-red-700'
-            }`}>
-              {ffmpegAvailable ? (
-                <CheckCircle className="w-4 h-4" />
-              ) : (
-                <XCircle className="w-4 h-4" />
-              )}
-              <span className="text-sm font-medium">
-                FFmpeg {ffmpegAvailable === null ? '...' : ffmpegAvailable ? 'Ready' : 'Not Found'}
-              </span>
+            {/* Mode Toggle */}
+            <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1 border border-gray-200">
+              <button
+                onClick={() => setMode('jsmpeg')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                  mode === 'jsmpeg'
+                    ? 'bg-white text-gray-900 shadow-sm border border-gray-200'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                <Play className="w-3.5 h-3.5" />
+                JSMpeg
+              </button>
+              <button
+                onClick={() => setMode('webrtc')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                  mode === 'webrtc'
+                    ? 'bg-white text-gray-900 shadow-sm border border-gray-200'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                <Radio className="w-3.5 h-3.5" />
+                WebRTC
+              </button>
             </div>
+
+            {/* FFmpeg Status — only relevant in JSMpeg mode */}
+            {mode === 'jsmpeg' && (
+              <div className={`flex items-center gap-2 px-4 py-2 rounded-lg border ${
+                ffmpegAvailable
+                  ? 'bg-green-50 border-green-200 text-green-700'
+                  : 'bg-red-50 border-red-200 text-red-700'
+              }`}>
+                {ffmpegAvailable ? (
+                  <CheckCircle className="w-4 h-4" />
+                ) : (
+                  <XCircle className="w-4 h-4" />
+                )}
+                <span className="text-sm font-medium">
+                  FFmpeg {ffmpegAvailable === null ? '...' : ffmpegAvailable ? 'Ready' : 'Not Found'}
+                </span>
+              </div>
+            )}
 
             {/* Start/Stop All Buttons */}
             {cameras.length > 0 && (
@@ -357,12 +419,10 @@ function CameraDisplay() {
                 </div>
               </div>
               <div className="flex-1 bg-gray-900 relative overflow-hidden min-h-0 max-h-full">
-                {camera.active && camera.wsUrl ? (
-                  <RTSPPlayer
-                    wsUrl={camera.wsUrl}
-                    width={1920}
-                    height={1080}
-                  />
+                {mode === 'webrtc' ? (
+                  <WebRTCPlayer streamName={go2rtcStreamName(camera)} />
+                ) : camera.active && camera.wsUrl ? (
+                  <RTSPPlayer wsUrl={camera.wsUrl} width={1920} height={1080} />
                 ) : (
                   <div className="absolute inset-0 flex items-center justify-center">
                     <div className="text-center px-6">
@@ -442,7 +502,7 @@ function CameraDisplay() {
                 </button>
                 <button
                   type="submit"
-                  disabled={!ffmpegAvailable}
+                  disabled={mode === 'jsmpeg' && !ffmpegAvailable}
                   className="flex-1 px-4 py-2.5 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium shadow-sm"
                 >
                   Add Camera

@@ -1,9 +1,16 @@
+import 'dotenv/config';
 import { WebSocketServer } from 'ws';
 import { spawn, spawnSync } from 'child_process';
 import http from 'http';
 import { existsSync, readdirSync } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
+
+const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret_change_in_production';
+const AUTH_PHONE = process.env.AUTH_PHONE;
+const AUTH_PASSWORD_HASH = process.env.AUTH_PASSWORD_HASH;
 
 const streams = new Map();
 
@@ -82,7 +89,7 @@ const httpServer = http.createServer((req, res) => {
   // CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
   if (req.method === 'OPTIONS') {
     res.writeHead(204);
@@ -91,6 +98,50 @@ const httpServer = http.createServer((req, res) => {
   }
 
   const url = new URL(req.url, `http://${req.headers.host}`);
+
+  // Login — public
+  if (url.pathname === '/api/login' && req.method === 'POST') {
+    let body = '';
+    req.on('data', chunk => body += chunk);
+    req.on('end', async () => {
+      try {
+        const { phone, password } = JSON.parse(body);
+        if (!phone || !password) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          return res.end(JSON.stringify({ success: false, message: 'Phone and password are required' }));
+        }
+        if (!AUTH_PHONE || !AUTH_PASSWORD_HASH) {
+          res.writeHead(503, { 'Content-Type': 'application/json' });
+          return res.end(JSON.stringify({ success: false, message: 'Auth not configured on server' }));
+        }
+        if (phone !== AUTH_PHONE || !(await bcrypt.compare(password, AUTH_PASSWORD_HASH))) {
+          res.writeHead(401, { 'Content-Type': 'application/json' });
+          return res.end(JSON.stringify({ success: false, message: 'Invalid credentials' }));
+        }
+        const token = jwt.sign({ phone }, JWT_SECRET);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: true, token }));
+      } catch (e) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, message: e.message }));
+      }
+    });
+    return;
+  }
+
+  // Verify JWT for all other /api routes
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+  if (!token) {
+    res.writeHead(401, { 'Content-Type': 'application/json' });
+    return res.end(JSON.stringify({ success: false, message: 'Unauthorized' }));
+  }
+  try {
+    jwt.verify(token, JWT_SECRET);
+  } catch {
+    res.writeHead(401, { 'Content-Type': 'application/json' });
+    return res.end(JSON.stringify({ success: false, message: 'Invalid or expired token' }));
+  }
 
   // Check FFmpeg availability
   if (url.pathname === '/api/check-ffmpeg') {

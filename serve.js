@@ -13,6 +13,8 @@ import { dirname, join } from 'path';
 import net from 'net';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import { createServer } from 'http';
+import { request as httpRequest } from 'http';
 
 function isPortInUse(port) {
   return new Promise((resolve) => {
@@ -53,6 +55,7 @@ const streams = new Map();
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret_change_in_production';
 const AUTH_PHONE = process.env.AUTH_PHONE;
 const AUTH_PASSWORD_HASH = process.env.AUTH_PASSWORD_HASH;
+const GO2RTC_URL = process.env.GO2RTC_URL || 'http://127.0.0.1:1984';
 
 if (!AUTH_PHONE || !AUTH_PASSWORD_HASH) {
   console.warn('WARNING: AUTH_PHONE or AUTH_PASSWORD_HASH not set in .env — login will be disabled');
@@ -158,6 +161,24 @@ app.get('/api/streams', requireAuth, (req, res) => {
     active: true
   }));
   res.json(activeStreams);
+});
+
+// Proxy: go2rtc API — authenticated, proxied over port 80 so Cloudflare can reach it
+app.use('/api/go2rtc', requireAuth, (req, res) => {
+  const target = new URL(GO2RTC_URL);
+  const options = {
+    hostname: target.hostname,
+    port: target.port || 1984,
+    path: req.url,
+    method: req.method,
+    headers: { ...req.headers, host: target.host },
+  };
+  const proxy = httpRequest(options, (upstream) => {
+    res.writeHead(upstream.statusCode, upstream.headers);
+    upstream.pipe(res);
+  });
+  proxy.on('error', () => res.status(502).json({ success: false, message: 'go2rtc unavailable' }));
+  req.pipe(proxy);
 });
 
 // Serve static files (React app)

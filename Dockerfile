@@ -26,8 +26,8 @@ WORKDIR /app
 # Copy package files
 COPY package.json package-lock.json ./
 
-# Install production dependencies (ws for WebSocket, express for serving)
-RUN npm install ws express
+# Install production dependencies
+RUN npm install ws express bcryptjs jsonwebtoken dotenv
 
 # Copy server files
 COPY server.js ./
