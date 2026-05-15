@@ -1,4 +1,6 @@
-import 'dotenv/config';
+import dotenv from 'dotenv';
+dotenv.config();
+dotenv.config({ path: '.env.secret' });
 import { WebSocketServer } from 'ws';
 import { spawn, spawnSync } from 'child_process';
 import http from 'http';

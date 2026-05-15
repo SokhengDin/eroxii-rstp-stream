@@ -30,5 +30,6 @@ tests/
 
 # Environment / secrets
 .env
+.env.secret
 .env.local
 .env.*.local

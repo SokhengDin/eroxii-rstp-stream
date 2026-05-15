@@ -4,7 +4,9 @@
  * - Provides RTSP streaming API with FFmpeg + WebSocket
  */
 
-import 'dotenv/config';
+import dotenv from 'dotenv';
+dotenv.config();
+dotenv.config({ path: '.env.secret' });
 import express from 'express';
 import { WebSocketServer } from 'ws';
 import { spawn } from 'child_process';
