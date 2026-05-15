@@ -54,7 +54,7 @@ export default function WebRTCPlayer({ streamName, rtspUrl, active, onStop }) {
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
 
-        const res = await fetch(`/api/go2rtc/api/webrtc?src=${encodeURIComponent(streamName)}`, {
+        const res = await fetch(`/api/go2rtc/api/whep?src=${encodeURIComponent(streamName)}`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/sdp',
