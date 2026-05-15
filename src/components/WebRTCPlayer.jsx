@@ -23,11 +23,13 @@ export default function WebRTCPlayer({ streamName, rtspUrl, active, onStop }) {
     async function connect() {
       setStatus('connecting');
       try {
-        // Register stream in go2rtc
-        await fetch(`/api/go2rtc/api/streams?name=${encodeURIComponent(streamName)}&src=${encodeURIComponent(rtspUrl)}`, {
-          method: 'PUT',
-          headers: { 'x-session-token': localStorage.getItem('auth-token') || '' },
-        });
+        await fetch(
+          `/api/go2rtc/api/streams?name=${encodeURIComponent(streamName)}&src=${encodeURIComponent(rtspUrl)}`,
+          {
+            method: 'PUT',
+            headers: { 'x-session-token': localStorage.getItem('auth-token') || '' },
+          }
+        );
 
         if (cancelled) return;
 
@@ -46,36 +48,34 @@ export default function WebRTCPlayer({ streamName, rtspUrl, active, onStop }) {
           if (cancelled) return;
           const s = pc.iceConnectionState;
           if (s === 'connected' || s === 'completed') setStatus('connected');
-          if (s === 'disconnected' || s === 'failed') setStatus('disconnected');
+          else if (s === 'disconnected' || s === 'failed') setStatus('disconnected');
         };
 
-        // Force H264 only — matches camera codec, no re-encoding
+        // Force H264 — matches camera codec, no re-encoding in go2rtc
         const videoTrx = pc.addTransceiver('video', { direction: 'recvonly' });
-        const { codecs } = RTCRtpReceiver.getCapabilities('video');
-        const h264 = codecs.filter(c => c.mimeType === 'video/H264');
-        if (h264.length) videoTrx.setCodecPreferences(h264);
+        const caps = RTCRtpReceiver.getCapabilities?.('video');
+        if (caps) {
+          const h264 = caps.codecs.filter(c => c.mimeType === 'video/H264');
+          if (h264.length) videoTrx.setCodecPreferences(h264);
+        }
 
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
 
-        // Wait for ICE gathering — max 2s then send whatever we have
-        await new Promise((resolve) => {
-          if (pc.iceGatheringState === 'complete') return resolve();
-          const check = () => { if (pc.iceGatheringState === 'complete') resolve(); };
-          pc.addEventListener('icegatheringstatechange', check);
-          setTimeout(resolve, 2000);
-        });
-
         if (cancelled) return;
 
-        const res = await fetch(`/api/go2rtc/api/webrtc?src=${encodeURIComponent(streamName)}`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/sdp',
-            'x-session-token': localStorage.getItem('auth-token') || '',
-          },
-          body: pc.localDescription.sdp,
-        });
+        // Send offer immediately — go2rtc provides ICE candidates in its answer
+        const res = await fetch(
+          `/api/go2rtc/api/webrtc?src=${encodeURIComponent(streamName)}`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/sdp',
+              'x-session-token': localStorage.getItem('auth-token') || '',
+            },
+            body: pc.localDescription.sdp,
+          }
+        );
 
         if (!res.ok) {
           const err = await res.text();

@@ -29,6 +29,11 @@ export default defineConfig(async () => ({
     },
     proxy: {
       '/api': 'http://127.0.0.1:3001',
+      '/ws': {
+        target: 'ws://127.0.0.1:3001',
+        ws: true,
+        rewriteWsOrigin: true,
+      },
     },
   },
 }));

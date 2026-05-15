@@ -83,6 +83,9 @@ function findFFmpeg() {
 const FFMPEG_PATH = findFFmpeg();
 console.log(`Using FFmpeg: ${FFMPEG_PATH}`);
 
+// Single WebSocket server — routes upgrades by path /ws/stream/:port
+const sharedWss = new WebSocketServer({ noServer: true });
+
 // Create HTTP server for API endpoints
 const httpServer = http.createServer((req, res) => {
   // CORS headers
@@ -155,10 +158,13 @@ const httpServer = http.createServer((req, res) => {
         const { rtspUrl, wsPort } = JSON.parse(body);
 
         if (streams.has(wsPort)) {
-          res.writeHead(400, { 'Content-Type': 'application/json' });
+          // Already running — return the path-based url
+          res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({
-            success: false,
-            message: `Port ${wsPort} is already in use`
+            success: true,
+            message: `Stream already running`,
+            ws_url: `/ws/stream/${wsPort}`,
+            port: wsPort,
           }));
           return;
         }
@@ -197,8 +203,8 @@ const httpServer = http.createServer((req, res) => {
     const activeStreams = Array.from(streams.entries()).map(([port, info]) => ({
       port,
       rtsp_url: info.rtspUrl,
-      ws_url: `ws://127.0.0.1:${port}`,
-      active: true
+      ws_url: `/ws/stream/${port}`,
+      active: true,
     }));
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify(activeStreams));
@@ -210,12 +216,10 @@ const httpServer = http.createServer((req, res) => {
 });
 
 function startStream(rtspUrl, wsPort) {
-  console.log(`Starting stream: ${rtspUrl} on port ${wsPort}`);
+  console.log(`Starting stream: ${rtspUrl} [id=${wsPort}]`);
 
-  // Create WebSocket server
-  const wss = new WebSocketServer({ port: wsPort });
+  const clients = new Set();
 
-  // Start FFmpeg
   const ffmpeg = spawn(FFMPEG_PATH, [
     '-rtsp_transport', 'tcp',
     '-fflags', 'nobuffer',
@@ -230,91 +234,65 @@ function startStream(rtspUrl, wsPort) {
     '-r', '25',
     '-an',
     '-flush_packets', '1',
-    'pipe:1'
+    'pipe:1',
   ]);
 
-  let totalBytes = 0;
-
   ffmpeg.stdout.on('data', (data) => {
-    totalBytes += data.length;
-
-    // Broadcast to all connected clients
-    wss.clients.forEach((client) => {
-      if (client.readyState === 1) { // WebSocket.OPEN
-        client.send(data);
-      }
+    clients.forEach((ws) => {
+      if (ws.readyState === 1) ws.send(data);
     });
   });
 
   ffmpeg.stderr.on('data', (data) => {
     const msg = data.toString();
-    if (!msg.includes('frame=')) { // Filter out progress lines
+    if (!msg.includes('frame=')) {
       console.log(`FFmpeg [${wsPort}]:`, msg.trim());
     }
   });
 
   ffmpeg.on('close', (code) => {
-    console.log(`FFmpeg process exited with code ${code}`);
-    stopStream(wsPort);
+    console.log(`FFmpeg [${wsPort}] exited with code ${code}`);
+    streams.delete(wsPort);
   });
 
   ffmpeg.on('error', (err) => {
-    console.error('FFmpeg error:', err);
-    stopStream(wsPort);
+    console.error(`FFmpeg error [${wsPort}]:`, err);
+    streams.delete(wsPort);
   });
 
-  // Store stream info
-  streams.set(wsPort, {
-    rtspUrl,
-    wss,
-    ffmpeg,
-    totalBytes: 0
-  });
-
-  wss.on('connection', (ws) => {
-    console.log(`Client connected to stream on port ${wsPort}`);
-
-    ws.on('close', () => {
-      console.log(`Client disconnected from stream on port ${wsPort}`);
-    });
-  });
+  streams.set(wsPort, { rtspUrl, ffmpeg, clients });
 
   return {
     success: true,
-    message: `Stream started on port ${wsPort}`,
-    ws_url: `ws://127.0.0.1:${wsPort}`,
-    port: wsPort
+    message: `Stream started`,
+    ws_url: `/ws/stream/${wsPort}`,
+    port: wsPort,
   };
 }
 
 function stopStream(wsPort) {
   const stream = streams.get(wsPort);
-
   if (!stream) {
-    return {
-      success: false,
-      message: `No stream found on port ${wsPort}`
-    };
+    return { success: false, message: `No stream found [${wsPort}]` };
   }
-
-  // Kill FFmpeg
-  if (stream.ffmpeg) {
-    stream.ffmpeg.kill('SIGTERM');
-  }
-
-  // Close WebSocket server
-  if (stream.wss) {
-    stream.wss.close();
-  }
-
+  try { stream.ffmpeg.kill('SIGTERM'); } catch {}
+  stream.clients.forEach((ws) => { try { ws.close(); } catch {} });
   streams.delete(wsPort);
-
-  return {
-    success: true,
-    message: `Stream on port ${wsPort} stopped`,
-    port: wsPort
-  };
+  return { success: true, message: `Stream stopped`, port: wsPort };
 }
+
+// Route WebSocket upgrades by path /ws/stream/:port
+httpServer.on('upgrade', (req, socket, head) => {
+  const match = req.url?.match(/^\/ws\/stream\/(\d+)/);
+  if (!match) { socket.destroy(); return; }
+  const wsPort = Number(match[1]);
+  const stream = streams.get(wsPort);
+  if (!stream) { socket.write('HTTP/1.1 404 Not Found\r\n\r\n'); socket.destroy(); return; }
+  sharedWss.handleUpgrade(req, socket, head, (ws) => {
+    stream.clients.add(ws);
+    ws.on('close', () => stream.clients.delete(ws));
+  });
+});
 
 // Start HTTP server
 const API_PORT = 3001;

@@ -156,9 +156,14 @@ function CameraDisplay() {
       }
 
       if (response?.success) {
+        // Convert path-based ws_url (/ws/stream/id) to absolute WebSocket URL
+        const wsPath = response.ws_url;
+        const wsUrl = wsPath.startsWith('ws')
+          ? wsPath
+          : `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}${wsPath}`;
         setCameras(prev => prev.map(c =>
           c.id === camera.id
-            ? { ...c, active: true, wsUrl: response.ws_url }
+            ? { ...c, active: true, wsUrl }
             : c
         ));
       } else {
