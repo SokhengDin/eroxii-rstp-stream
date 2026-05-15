@@ -7,4 +7,4 @@ rtsp:
 webrtc:
   listen: ":8555/tcp"
   candidates:
-    - stun:stun.l.google.com:19302
+    - ${WEBRTC_CANDIDATE}
