@@ -247,119 +247,110 @@ function CameraDisplay() {
     <div className="flex-1 flex flex-col bg-gray-50">
       {/* Header - Hidden in fullscreen */}
       {!isFullscreen && (
-        <div className="bg-white border-b border-gray-200 px-8 py-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Camera Display</h1>
-            <p className="text-sm text-gray-500 mt-1">Manage and monitor RTSP camera streams</p>
-          </div>
-          <div className="flex items-center gap-3">
-            {/* Tab Navigation */}
-            {totalTabs > 1 && (
-              <div className="flex gap-2">
-                {Array.from({ length: totalTabs }, (_, i) => (
-                  <button
-                    key={i}
-                    onClick={() => setCurrentTab(i)}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                      currentTab === i
-                        ? 'bg-blue-500 text-white shadow-sm'
-                        : 'text-gray-600 hover:bg-gray-100 border border-gray-200'
-                    }`}
-                  >
-                    Page {i + 1}
-                  </button>
-                ))}
+        <div className="bg-white border-b border-gray-200 px-6 py-4">
+          {/* Row 1: Title + action buttons */}
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <h1 className="text-2xl font-bold text-gray-900">Camera Display</h1>
+              <p className="text-sm text-gray-500 mt-0.5">Manage and monitor RTSP camera streams</p>
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              {/* Mode Toggle */}
+              <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1 border border-gray-200">
+                <button
+                  onClick={() => setMode('jsmpeg')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                    mode === 'jsmpeg'
+                      ? 'bg-white text-gray-900 shadow-sm border border-gray-200'
+                      : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  <Play className="w-3.5 h-3.5" />
+                  JSMpeg
+                </button>
+                <button
+                  onClick={() => setMode('webrtc')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                    mode === 'webrtc'
+                      ? 'bg-white text-gray-900 shadow-sm border border-gray-200'
+                      : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  <Radio className="w-3.5 h-3.5" />
+                  WebRTC
+                </button>
               </div>
-            )}
 
-            {/* Mode Toggle */}
-            <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1 border border-gray-200">
+              {/* FFmpeg status badge — JSMpeg only */}
+              {mode === 'jsmpeg' && (
+                <div className={`flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm font-medium ${
+                  ffmpegAvailable
+                    ? 'bg-green-50 border-green-200 text-green-700'
+                    : 'bg-red-50 border-red-200 text-red-700'
+                }`}>
+                  {ffmpegAvailable ? <CheckCircle className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
+                  <span>FFmpeg {ffmpegAvailable === null ? '...' : ffmpegAvailable ? 'Ready' : 'Not Found'}</span>
+                </div>
+              )}
+
+              {/* Start / Stop All — icon only with tooltip */}
+              {cameras.length > 0 && mode === 'jsmpeg' && (
+                <>
+                  <button
+                    onClick={startAllOnPage}
+                    title="Start All"
+                    className="p-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors shadow-sm"
+                  >
+                    <Play className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={stopAllOnPage}
+                    title="Stop All"
+                    className="p-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors shadow-sm"
+                  >
+                    <Square className="w-4 h-4" />
+                  </button>
+                </>
+              )}
+
+              {/* Add Camera */}
               <button
-                onClick={() => setMode('jsmpeg')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
-                  mode === 'jsmpeg'
-                    ? 'bg-white text-gray-900 shadow-sm border border-gray-200'
-                    : 'text-gray-500 hover:text-gray-700'
-                }`}
+                onClick={() => setShowAddForm(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors font-medium shadow-sm text-sm"
               >
-                <Play className="w-3.5 h-3.5" />
-                JSMpeg
+                <Plus className="w-4 h-4" />
+                Add Camera
               </button>
+
+              {/* Fullscreen */}
               <button
-                onClick={() => setMode('webrtc')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
-                  mode === 'webrtc'
-                    ? 'bg-white text-gray-900 shadow-sm border border-gray-200'
-                    : 'text-gray-500 hover:text-gray-700'
-                }`}
+                onClick={() => setIsFullscreen(true)}
+                title="Fullscreen"
+                className="p-2 bg-gray-700 text-white rounded-lg hover:bg-gray-800 transition-colors shadow-sm"
               >
-                <Radio className="w-3.5 h-3.5" />
-                WebRTC
+                <Maximize className="w-4 h-4" />
               </button>
             </div>
-
-            {/* FFmpeg Status — only relevant in JSMpeg mode */}
-            {mode === 'jsmpeg' && (
-              <div className={`flex items-center gap-2 px-4 py-2 rounded-lg border ${
-                ffmpegAvailable
-                  ? 'bg-green-50 border-green-200 text-green-700'
-                  : 'bg-red-50 border-red-200 text-red-700'
-              }`}>
-                {ffmpegAvailable ? (
-                  <CheckCircle className="w-4 h-4" />
-                ) : (
-                  <XCircle className="w-4 h-4" />
-                )}
-                <span className="text-sm font-medium">
-                  FFmpeg {ffmpegAvailable === null ? '...' : ffmpegAvailable ? 'Ready' : 'Not Found'}
-                </span>
-              </div>
-            )}
-
-            {/* Start/Stop All Buttons */}
-            {cameras.length > 0 && (
-              <>
-                <button
-                  onClick={startAllOnPage}
-                  className="flex items-center gap-2 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors font-medium shadow-sm"
-                >
-                  <Play className="w-4 h-4" />
-                  <span>Start All</span>
-                </button>
-                <button
-                  onClick={stopAllOnPage}
-                  className="flex items-center gap-2 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors font-medium shadow-sm"
-                >
-                  <Square className="w-4 h-4" />
-                  <span>Stop All</span>
-                </button>
-              </>
-            )}
-
-            {/* Add Camera Button */}
-            <button
-              onClick={() => setShowAddForm(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors font-medium shadow-sm"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Add Camera</span>
-            </button>
-
-            {/* Fullscreen Toggle Button */}
-            <button
-              onClick={() => setIsFullscreen(!isFullscreen)}
-              className="flex items-center gap-2 px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-800 transition-colors font-medium shadow-sm"
-              title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
-            >
-              {isFullscreen ? (
-                <Minimize className="w-4 h-4" />
-              ) : (
-                <Maximize className="w-4 h-4" />
-              )}
-            </button>
           </div>
-        </div>
+
+          {/* Row 2: Tab pagination — only when needed */}
+          {totalTabs > 1 && (
+            <div className="flex gap-2 mt-3">
+              {Array.from({ length: totalTabs }, (_, i) => (
+                <button
+                  key={i}
+                  onClick={() => setCurrentTab(i)}
+                  className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                    currentTab === i
+                      ? 'bg-blue-500 text-white shadow-sm'
+                      : 'text-gray-600 hover:bg-gray-100 border border-gray-200'
+                  }`}
+                >
+                  Page {i + 1}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
