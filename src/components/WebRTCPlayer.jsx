@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 
-export default function WebRTCPlayer({ streamName, active, onStop }) {
+export default function WebRTCPlayer({ streamName, rtspUrl, active, onStop }) {
   const videoRef = useRef(null);
   const pcRef = useRef(null);
   const [status, setStatus] = useState('idle');
@@ -10,21 +10,27 @@ export default function WebRTCPlayer({ streamName, active, onStop }) {
       pcRef.current.close();
       pcRef.current = null;
     }
-    if (videoRef.current) {
-      videoRef.current.srcObject = null;
-    }
+    if (videoRef.current) videoRef.current.srcObject = null;
     setStatus('idle');
     onStop?.();
   }, [onStop]);
 
   useEffect(() => {
-    if (!active || !streamName) return;
+    if (!active || !streamName || !rtspUrl) return;
 
     let cancelled = false;
 
     async function connect() {
       setStatus('connecting');
       try {
+        // Register stream in go2rtc first
+        await fetch(`/api/go2rtc/api/streams?name=${encodeURIComponent(streamName)}&src=${encodeURIComponent(rtspUrl)}`, {
+          method: 'PUT',
+          headers: { 'x-session-token': localStorage.getItem('auth-token') || '' },
+        });
+
+        if (cancelled) return;
+
         const pc = new RTCPeerConnection({
           iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
         });
@@ -57,7 +63,7 @@ export default function WebRTCPlayer({ streamName, active, onStop }) {
           body: offer.sdp,
         });
 
-        if (!res.ok) throw new Error(`go2rtc error ${res.status}`);
+        if (!res.ok) throw new Error(`go2rtc ${res.status}`);
 
         const answer = await res.text();
         if (cancelled) return;
@@ -80,7 +86,7 @@ export default function WebRTCPlayer({ streamName, active, onStop }) {
       }
       if (videoRef.current) videoRef.current.srcObject = null;
     };
-  }, [active, streamName]);
+  }, [active, streamName, rtspUrl]);
 
   const statusColor = {
     connected: '#4ade80',

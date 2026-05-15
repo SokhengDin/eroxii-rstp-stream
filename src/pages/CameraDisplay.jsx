@@ -287,12 +287,20 @@ function CameraDisplay() {
               )}
 
               {/* Start / Stop All */}
-              {cameras.length > 0 && mode === 'jsmpeg' && (
+              {cameras.length > 0 && (
                 <>
-                  <button onClick={startAllOnPage} title="Start All" className="p-1.5 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors">
+                  <button
+                    onClick={mode === 'jsmpeg' ? startAllOnPage : () => setCameras(prev => prev.map(c => ({ ...c, webrtcActive: true })))}
+                    title="Start All"
+                    className="p-1.5 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
+                  >
                     <Play className="w-3.5 h-3.5" />
                   </button>
-                  <button onClick={stopAllOnPage} title="Stop All" className="p-1.5 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors">
+                  <button
+                    onClick={mode === 'jsmpeg' ? stopAllOnPage : () => setCameras(prev => prev.map(c => ({ ...c, webrtcActive: false })))}
+                    title="Stop All"
+                    className="p-1.5 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
+                  >
                     <Square className="w-3.5 h-3.5" />
                   </button>
                 </>
@@ -413,6 +421,7 @@ function CameraDisplay() {
                 {mode === 'webrtc' ? (
                   <WebRTCPlayer
                     streamName={go2rtcStreamName(camera)}
+                    rtspUrl={camera.rtspUrl}
                     active={!!camera.webrtcActive}
                     onStop={() => setCameras(prev => prev.map(c => c.id === camera.id ? { ...c, webrtcActive: false } : c))}
                   />
