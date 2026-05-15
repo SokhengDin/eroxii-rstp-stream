@@ -1,35 +1,47 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 
-export default function WebRTCPlayer({ streamName }) {
+export default function WebRTCPlayer({ streamName, active, onStop }) {
   const videoRef = useRef(null);
   const pcRef = useRef(null);
-  const [status, setStatus] = useState('connecting');
+  const [status, setStatus] = useState('idle');
+
+  const stop = useCallback(() => {
+    if (pcRef.current) {
+      pcRef.current.close();
+      pcRef.current = null;
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+    setStatus('idle');
+    onStop?.();
+  }, [onStop]);
 
   useEffect(() => {
-    if (!streamName || !videoRef.current) return;
+    if (!active || !streamName) return;
 
-    let pc;
+    let cancelled = false;
 
-    async function start() {
+    async function connect() {
       setStatus('connecting');
       try {
-        pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+        const pc = new RTCPeerConnection({
+          iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
+        });
         pcRef.current = pc;
 
         pc.ontrack = (e) => {
-          if (videoRef.current) {
-            videoRef.current.srcObject = e.streams[0];
-            setStatus('connected');
-          }
+          if (cancelled) return;
+          if (videoRef.current) videoRef.current.srcObject = e.streams[0];
         };
 
         pc.oniceconnectionstatechange = () => {
-          if (pc.iceConnectionState === 'disconnected' || pc.iceConnectionState === 'failed') {
-            setStatus('disconnected');
-          }
+          if (cancelled) return;
+          const s = pc.iceConnectionState;
+          if (s === 'connected' || s === 'completed') setStatus('connected');
+          if (s === 'disconnected' || s === 'failed') setStatus('disconnected');
         };
 
-        // Add transceiver so go2rtc knows we want video
         pc.addTransceiver('video', { direction: 'recvonly' });
         pc.addTransceiver('audio', { direction: 'recvonly' });
 
@@ -45,39 +57,47 @@ export default function WebRTCPlayer({ streamName }) {
           body: offer.sdp,
         });
 
-        if (!res.ok) throw new Error(`go2rtc ${res.status}`);
+        if (!res.ok) throw new Error(`go2rtc error ${res.status}`);
 
         const answer = await res.text();
+        if (cancelled) return;
         await pc.setRemoteDescription({ type: 'answer', sdp: answer });
       } catch (err) {
-        console.error('WebRTC error:', err);
-        setStatus('error');
+        if (!cancelled) {
+          console.error('WebRTC:', err);
+          setStatus('error');
+        }
       }
     }
 
-    start();
+    connect();
 
     return () => {
+      cancelled = true;
       if (pcRef.current) {
         pcRef.current.close();
         pcRef.current = null;
       }
-      if (videoRef.current) {
-        videoRef.current.srcObject = null;
-      }
+      if (videoRef.current) videoRef.current.srcObject = null;
     };
-  }, [streamName]);
+  }, [active, streamName]);
 
-  const statusColor = status === 'connected' ? '#4ade80' : status === 'connecting' ? '#fbbf24' : '#ef4444';
+  const statusColor = {
+    connected: '#4ade80',
+    connecting: '#fbbf24',
+    disconnected: '#ef4444',
+    error: '#ef4444',
+    idle: '#6b7280',
+  }[status] ?? '#6b7280';
+
+  if (!active) return null;
 
   return (
     <div className="absolute inset-0">
-      {/* Status badge */}
       <div className="absolute top-1 left-1 z-10 flex items-center gap-1 bg-black/60 backdrop-blur-sm px-1.5 py-0.5 rounded text-[10px]">
         <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: statusColor }} />
         <span className="text-white font-medium">{status}</span>
       </div>
-
       <video
         ref={videoRef}
         autoPlay

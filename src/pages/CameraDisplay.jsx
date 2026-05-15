@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Play, Square, X, CheckCircle, XCircle, Info, Maximize, Minimize, Radio } from 'lucide-react';
+import { Plus, Play, Square, X, CheckCircle, XCircle, Maximize, Minimize, Radio } from 'lucide-react';
 import RTSPPlayer from '../components/RTSPPlayer';
 import WebRTCPlayer from '../components/WebRTCPlayer';
 import { apiFetch } from '../utils/api';
@@ -59,7 +59,6 @@ function CameraDisplay() {
   const [cameras, setCameras] = useState(loadCameras);
   const [currentTab, setCurrentTab] = useState(0);
   const [ffmpegAvailable, setFfmpegAvailable] = useState(null);
-  const [status, setStatus] = useState('');
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [mode, setMode] = useState(() => localStorage.getItem('stream-mode') || 'jsmpeg');
 
@@ -162,12 +161,9 @@ function CameraDisplay() {
             ? { ...c, active: true, wsUrl: response.ws_url }
             : c
         ));
-        setStatus(`Started: ${camera.name}`);
       } else {
-        setStatus(`Error: ${response?.message || 'Failed to start stream'}`);
       }
     } catch (err) {
-      setStatus(`Error: ${err}`);
     }
   };
 
@@ -186,9 +182,7 @@ function CameraDisplay() {
       setCameras(prev => prev.map(c =>
         c.id === camera.id ? { ...c, active: false, wsUrl: null } : c
       ));
-      setStatus(`Stopped: ${camera.name}`);
     } catch (err) {
-      setStatus(`Error stopping: ${err}`);
     }
   };
 
@@ -196,7 +190,6 @@ function CameraDisplay() {
     e.preventDefault();
 
     if (!newCamera.name || !newCamera.rtspUrl) {
-      setStatus('Please fill in camera name and RTSP URL');
       return;
     }
 
@@ -214,7 +207,6 @@ function CameraDisplay() {
     setCameras(prev => [...prev, camera]);
     setNewCamera({ name: '', rtspUrl: '' });
     setShowAddForm(false);
-    setStatus(`Added camera: ${camera.name}`);
     if (mode === 'webrtc') registerGo2rtcStream(camera);
   };
 
@@ -222,7 +214,6 @@ function CameraDisplay() {
     if (camera.active) await stopStream(camera);
     await unregisterGo2rtcStream(camera);
     setCameras(prev => prev.filter(c => c.id !== camera.id));
-    setStatus(`Removed: ${camera.name}`);
   };
 
   const startAllOnPage = async () => {
@@ -361,13 +352,6 @@ function CameraDisplay() {
 
       {/* Camera Grid Content */}
       <div className={`flex-1 flex flex-col overflow-hidden ${isFullscreen ? 'p-0' : 'p-6'}`}>
-        {/* Status Message - Hidden in fullscreen */}
-        {status && !isFullscreen && (
-          <div className="mb-4 flex items-center gap-3 px-4 py-3 bg-blue-50 border border-blue-200 text-blue-800 rounded-lg">
-            <Info className="w-5 h-5 flex-shrink-0" />
-            <span className="text-sm">{status}</span>
-          </div>
-        )}
 
         {/* Dynamic Camera Grid */}
         <div className={`flex-1 grid min-h-0 overflow-hidden ${isFullscreen ? 'gap-0' : 'gap-3'}`} style={{ gridTemplateColumns: `repeat(${getGridCols(getCurrentPageCameras().length)}, 1fr)`, gridAutoRows: '1fr' }}>
@@ -377,7 +361,7 @@ function CameraDisplay() {
               <div className="flex items-center gap-1 px-2 py-1 border-b border-gray-200 flex-shrink-0 min-w-0">
                 <h3 className="font-medium text-gray-900 text-xs truncate flex-1 min-w-0">{camera.name}</h3>
                 <div className="flex items-center gap-0.5 flex-shrink-0">
-                  {mode === 'jsmpeg' && (
+                  {mode === 'jsmpeg' ? (
                     !camera.active ? (
                       <button
                         onClick={() => startStream(camera)}
@@ -396,6 +380,24 @@ function CameraDisplay() {
                         <Square className="w-3 h-3" />
                       </button>
                     )
+                  ) : (
+                    !camera.webrtcActive ? (
+                      <button
+                        onClick={() => setCameras(prev => prev.map(c => c.id === camera.id ? { ...c, webrtcActive: true } : c))}
+                        className="p-1 text-green-600 hover:bg-green-50 rounded transition-colors"
+                        title="Connect"
+                      >
+                        <Play className="w-3 h-3" />
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => setCameras(prev => prev.map(c => c.id === camera.id ? { ...c, webrtcActive: false } : c))}
+                        className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
+                        title="Disconnect"
+                      >
+                        <Square className="w-3 h-3" />
+                      </button>
+                    )
                   )}
                   <button
                     onClick={() => removeCamera(camera)}
@@ -409,13 +411,26 @@ function CameraDisplay() {
               {/* Video area */}
               <div className="flex-1 bg-gray-900 relative overflow-hidden min-h-0">
                 {mode === 'webrtc' ? (
-                  <WebRTCPlayer streamName={go2rtcStreamName(camera)} />
+                  <WebRTCPlayer
+                    streamName={go2rtcStreamName(camera)}
+                    active={!!camera.webrtcActive}
+                    onStop={() => setCameras(prev => prev.map(c => c.id === camera.id ? { ...c, webrtcActive: false } : c))}
+                  />
                 ) : camera.active && camera.wsUrl ? (
                   <RTSPPlayer wsUrl={camera.wsUrl} width={1920} height={1080} />
                 ) : (
                   <div className="absolute inset-0 flex items-center justify-center">
                     <div className="text-center px-3">
-                      <Play className="w-6 h-6 text-gray-600 mx-auto mb-1" />
+                      <Play className="w-5 h-5 text-gray-600 mx-auto mb-1" />
+                      <p className="text-gray-400 text-xs font-medium truncate max-w-full">{camera.name}</p>
+                    </div>
+                  </div>
+                )}
+                {/* WebRTC idle state */}
+                {mode === 'webrtc' && !camera.webrtcActive && (
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="text-center px-3">
+                      <Play className="w-5 h-5 text-gray-600 mx-auto mb-1" />
                       <p className="text-gray-400 text-xs font-medium truncate max-w-full">{camera.name}</p>
                     </div>
                   </div>
