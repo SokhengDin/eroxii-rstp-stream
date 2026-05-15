@@ -33,6 +33,7 @@ export default function WebRTCPlayer({ streamName, rtspUrl, active, onStop }) {
 
         const pc = new RTCPeerConnection({
           iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
+          bundlePolicy: 'max-bundle',
         });
         pcRef.current = pc;
 
@@ -48,20 +49,21 @@ export default function WebRTCPlayer({ streamName, rtspUrl, active, onStop }) {
           if (s === 'disconnected' || s === 'failed') setStatus('disconnected');
         };
 
-        pc.addTransceiver('video', { direction: 'recvonly' });
-        pc.addTransceiver('audio', { direction: 'recvonly' });
+        // Force H264 only — matches camera codec, no re-encoding
+        const videoTrx = pc.addTransceiver('video', { direction: 'recvonly' });
+        const { codecs } = RTCRtpReceiver.getCapabilities('video');
+        const h264 = codecs.filter(c => c.mimeType === 'video/H264');
+        if (h264.length) videoTrx.setCodecPreferences(h264);
 
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
 
-        // Wait for ICE gathering to complete before sending SDP
+        // Wait for ICE gathering — max 2s then send whatever we have
         await new Promise((resolve) => {
           if (pc.iceGatheringState === 'complete') return resolve();
-          pc.onicegatheringstatechange = () => {
-            if (pc.iceGatheringState === 'complete') resolve();
-          };
-          // Timeout fallback after 3s
-          setTimeout(resolve, 3000);
+          const check = () => { if (pc.iceGatheringState === 'complete') resolve(); };
+          pc.addEventListener('icegatheringstatechange', check);
+          setTimeout(resolve, 2000);
         });
 
         if (cancelled) return;
@@ -75,7 +77,10 @@ export default function WebRTCPlayer({ streamName, rtspUrl, active, onStop }) {
           body: pc.localDescription.sdp,
         });
 
-        if (!res.ok) throw new Error(`go2rtc ${res.status}`);
+        if (!res.ok) {
+          const err = await res.text();
+          throw new Error(`go2rtc ${res.status}: ${err}`);
+        }
 
         const answer = await res.text();
         if (cancelled) return;
