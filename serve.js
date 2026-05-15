@@ -56,7 +56,9 @@ const streams = new Map();
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret_change_in_production';
 const AUTH_PHONE = process.env.AUTH_PHONE;
-const AUTH_PASSWORD_HASH = process.env.AUTH_PASSWORD_HASH;
+const AUTH_PASSWORD_HASH = process.env.AUTH_PASSWORD_HASH_B64
+  ? Buffer.from(process.env.AUTH_PASSWORD_HASH_B64, 'base64url').toString('utf8')
+  : process.env.AUTH_PASSWORD_HASH;
 const GO2RTC_URL = process.env.GO2RTC_URL || 'http://127.0.0.1:1984';
 
 if (!AUTH_PHONE || !AUTH_PASSWORD_HASH) {
