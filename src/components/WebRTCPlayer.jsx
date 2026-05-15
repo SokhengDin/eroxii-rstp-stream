@@ -54,13 +54,25 @@ export default function WebRTCPlayer({ streamName, rtspUrl, active, onStop }) {
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
 
-        const res = await fetch(`/api/go2rtc/api/whep?src=${encodeURIComponent(streamName)}`, {
+        // Wait for ICE gathering to complete before sending SDP
+        await new Promise((resolve) => {
+          if (pc.iceGatheringState === 'complete') return resolve();
+          pc.onicegatheringstatechange = () => {
+            if (pc.iceGatheringState === 'complete') resolve();
+          };
+          // Timeout fallback after 3s
+          setTimeout(resolve, 3000);
+        });
+
+        if (cancelled) return;
+
+        const res = await fetch(`/api/go2rtc/api/webrtc?src=${encodeURIComponent(streamName)}`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/sdp',
             'x-session-token': localStorage.getItem('auth-token') || '',
           },
-          body: offer.sdp,
+          body: pc.localDescription.sdp,
         });
 
         if (!res.ok) throw new Error(`go2rtc ${res.status}`);
