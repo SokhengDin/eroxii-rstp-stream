@@ -2,7 +2,7 @@ services:
   app:
     build: .
     ports:
-      - "80:80"
+      - "8888:80"
       - "9900-9910:9900-9910"
     environment:
       - AUTH_PHONE=${AUTH_PHONE}
