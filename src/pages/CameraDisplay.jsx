@@ -247,88 +247,82 @@ function CameraDisplay() {
     <div className="flex-1 flex flex-col bg-gray-50">
       {/* Header - Hidden in fullscreen */}
       {!isFullscreen && (
-        <div className="bg-white border-b border-gray-200 px-6 py-4">
-          {/* Row 1: Title + action buttons */}
-          <div className="flex items-center justify-between gap-3">
+        <div className="bg-white border-b border-gray-200 px-4 py-3">
+          <div className="flex items-center justify-between gap-2">
+            {/* Title — hide subtitle on small screens */}
             <div className="min-w-0">
-              <h1 className="text-2xl font-bold text-gray-900">Camera Display</h1>
-              <p className="text-sm text-gray-500 mt-0.5">Manage and monitor RTSP camera streams</p>
+              <h1 className="text-lg sm:text-2xl font-bold text-gray-900 truncate">Camera Display</h1>
+              <p className="hidden sm:block text-sm text-gray-500 mt-0.5">Manage and monitor RTSP camera streams</p>
             </div>
-            <div className="flex items-center gap-2 flex-shrink-0">
+            <div className="flex items-center gap-1.5 flex-shrink-0">
               {/* Mode Toggle */}
               <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1 border border-gray-200">
                 <button
                   onClick={() => setMode('jsmpeg')}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                  title="JSMpeg mode"
+                  className={`flex items-center gap-1 px-2 py-1.5 rounded-md text-xs font-medium transition-all ${
                     mode === 'jsmpeg'
                       ? 'bg-white text-gray-900 shadow-sm border border-gray-200'
                       : 'text-gray-500 hover:text-gray-700'
                   }`}
                 >
-                  <Play className="w-3.5 h-3.5" />
-                  JSMpeg
+                  <Play className="w-3 h-3" />
+                  <span className="hidden sm:inline">JSMpeg</span>
                 </button>
                 <button
                   onClick={() => setMode('webrtc')}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                  title="WebRTC mode"
+                  className={`flex items-center gap-1 px-2 py-1.5 rounded-md text-xs font-medium transition-all ${
                     mode === 'webrtc'
                       ? 'bg-white text-gray-900 shadow-sm border border-gray-200'
                       : 'text-gray-500 hover:text-gray-700'
                   }`}
                 >
-                  <Radio className="w-3.5 h-3.5" />
-                  WebRTC
+                  <Radio className="w-3 h-3" />
+                  <span className="hidden sm:inline">WebRTC</span>
                 </button>
               </div>
 
-              {/* FFmpeg status badge — JSMpeg only */}
+              {/* FFmpeg status — icon only on small, with text on large */}
               {mode === 'jsmpeg' && (
-                <div className={`flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm font-medium ${
+                <div className={`flex items-center gap-1 px-2 py-1.5 rounded-lg border text-xs font-medium ${
                   ffmpegAvailable
                     ? 'bg-green-50 border-green-200 text-green-700'
                     : 'bg-red-50 border-red-200 text-red-700'
                 }`}>
-                  {ffmpegAvailable ? <CheckCircle className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
-                  <span>FFmpeg {ffmpegAvailable === null ? '...' : ffmpegAvailable ? 'Ready' : 'Not Found'}</span>
+                  {ffmpegAvailable ? <CheckCircle className="w-3.5 h-3.5" /> : <XCircle className="w-3.5 h-3.5" />}
+                  <span className="hidden sm:inline">{ffmpegAvailable === null ? '...' : ffmpegAvailable ? 'Ready' : 'Not Found'}</span>
                 </div>
               )}
 
-              {/* Start / Stop All — icon only with tooltip */}
+              {/* Start / Stop All */}
               {cameras.length > 0 && mode === 'jsmpeg' && (
                 <>
-                  <button
-                    onClick={startAllOnPage}
-                    title="Start All"
-                    className="p-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors shadow-sm"
-                  >
-                    <Play className="w-4 h-4" />
+                  <button onClick={startAllOnPage} title="Start All" className="p-1.5 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors">
+                    <Play className="w-3.5 h-3.5" />
                   </button>
-                  <button
-                    onClick={stopAllOnPage}
-                    title="Stop All"
-                    className="p-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors shadow-sm"
-                  >
-                    <Square className="w-4 h-4" />
+                  <button onClick={stopAllOnPage} title="Stop All" className="p-1.5 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors">
+                    <Square className="w-3.5 h-3.5" />
                   </button>
                 </>
               )}
 
-              {/* Add Camera */}
+              {/* Add Camera — icon only on small */}
               <button
                 onClick={() => setShowAddForm(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors font-medium shadow-sm text-sm"
+                className="flex items-center gap-1.5 px-2 sm:px-4 py-1.5 sm:py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors font-medium shadow-sm text-sm"
               >
-                <Plus className="w-4 h-4" />
-                Add Camera
+                <Plus className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Add Camera</span>
               </button>
 
               {/* Fullscreen */}
               <button
                 onClick={() => setIsFullscreen(true)}
                 title="Fullscreen"
-                className="p-2 bg-gray-700 text-white rounded-lg hover:bg-gray-800 transition-colors shadow-sm"
+                className="p-1.5 bg-gray-700 text-white rounded-lg hover:bg-gray-800 transition-colors"
               >
-                <Maximize className="w-4 h-4" />
+                <Maximize className="w-3.5 h-3.5" />
               </button>
             </div>
           </div>
