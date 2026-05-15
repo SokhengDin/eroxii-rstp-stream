@@ -40,7 +40,7 @@ export default function WebRTCPlayer({ streamName }) {
           method: 'POST',
           headers: {
             'Content-Type': 'application/sdp',
-            Authorization: `Bearer ${localStorage.getItem('auth-token')}`,
+            'x-session-token': localStorage.getItem('auth-token') || '',
           },
           body: offer.sdp,
         });

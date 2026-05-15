@@ -2,7 +2,7 @@ export function authHeaders(extra = {}) {
   const token = localStorage.getItem('auth-token');
   return {
     'Content-Type': 'application/json',
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(token ? { 'x-session-token': token } : {}),
     ...extra,
   };
 }

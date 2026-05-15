@@ -1,20 +1,15 @@
-import dotenv from 'dotenv';
-dotenv.config();
-dotenv.config({ path: '.env.secret' });
+import 'dotenv/config';
 import { WebSocketServer } from 'ws';
 import { spawn, spawnSync } from 'child_process';
 import http from 'http';
 import { existsSync, readdirSync } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
-import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
+import { randomBytes } from 'crypto';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret_change_in_production';
 const AUTH_PHONE = process.env.AUTH_PHONE;
-const AUTH_PASSWORD_HASH = process.env.AUTH_PASSWORD_HASH_B64
-  ? Buffer.from(process.env.AUTH_PASSWORD_HASH_B64, 'base64url').toString('utf8')
-  : process.env.AUTH_PASSWORD_HASH;
+const AUTH_PASSWORD = process.env.AUTH_PASSWORD;
+const sessions = new Set();
 
 const streams = new Map();
 
@@ -107,22 +102,19 @@ const httpServer = http.createServer((req, res) => {
   if (url.pathname === '/api/login' && req.method === 'POST') {
     let body = '';
     req.on('data', chunk => body += chunk);
-    req.on('end', async () => {
+    req.on('end', () => {
       try {
         const { phone, password } = JSON.parse(body);
         if (!phone || !password) {
           res.writeHead(400, { 'Content-Type': 'application/json' });
           return res.end(JSON.stringify({ success: false, message: 'Phone and password are required' }));
         }
-        if (!AUTH_PHONE || !AUTH_PASSWORD_HASH) {
-          res.writeHead(503, { 'Content-Type': 'application/json' });
-          return res.end(JSON.stringify({ success: false, message: 'Auth not configured on server' }));
-        }
-        if (phone !== AUTH_PHONE || !(await bcrypt.compare(password, AUTH_PASSWORD_HASH))) {
+        if (phone !== AUTH_PHONE || password !== AUTH_PASSWORD) {
           res.writeHead(401, { 'Content-Type': 'application/json' });
           return res.end(JSON.stringify({ success: false, message: 'Invalid credentials' }));
         }
-        const token = jwt.sign({ phone }, JWT_SECRET);
+        const token = randomBytes(32).toString('hex');
+        sessions.add(token);
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ success: true, token }));
       } catch (e) {
@@ -133,18 +125,11 @@ const httpServer = http.createServer((req, res) => {
     return;
   }
 
-  // Verify JWT for all other /api routes
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
-  if (!token) {
+  // Verify session token for all other /api routes
+  const token = req.headers['x-session-token'];
+  if (!token || !sessions.has(token)) {
     res.writeHead(401, { 'Content-Type': 'application/json' });
     return res.end(JSON.stringify({ success: false, message: 'Unauthorized' }));
-  }
-  try {
-    jwt.verify(token, JWT_SECRET);
-  } catch {
-    res.writeHead(401, { 'Content-Type': 'application/json' });
-    return res.end(JSON.stringify({ success: false, message: 'Invalid or expired token' }));
   }
 
   // Check FFmpeg availability
