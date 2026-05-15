@@ -15,6 +15,7 @@ import { dirname, join } from 'path';
 import { createServer } from 'http';
 import { randomBytes } from 'crypto';
 import { request as httpRequest } from 'http';
+import { readFileSync, writeFileSync, existsSync } from 'fs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -26,16 +27,37 @@ const streams = new Map(); // streamId -> { rtspUrl, ffmpeg, wss }
 const AUTH_PHONE = process.env.AUTH_PHONE;
 const AUTH_PASSWORD = process.env.AUTH_PASSWORD;
 const GO2RTC_URL = process.env.GO2RTC_URL || 'http://127.0.0.1:1984';
+const USERS_FILE = join(__dirname, 'users.json');
 
-// In-memory session tokens
-const sessions = new Set();
+// Load persisted users from disk
+function loadUsers() {
+  try {
+    if (existsSync(USERS_FILE)) return JSON.parse(readFileSync(USERS_FILE, 'utf8'));
+  } catch {}
+  return [];
+}
+
+function saveUsers(users) {
+  writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
+}
+
+// In-memory session tokens: token -> { phone, isAdmin }
+const sessions = new Map();
 
 function requireAuth(req, res, next) {
   const token = req.headers['x-session-token'];
   if (!token || !sessions.has(token)) {
     return res.status(401).json({ success: false, message: 'Unauthorized' });
   }
+  req.session = sessions.get(token);
   next();
+}
+
+function requireAdmin(req, res, next) {
+  requireAuth(req, res, () => {
+    if (!req.session.isAdmin) return res.status(403).json({ success: false, message: 'Forbidden' });
+    next();
+  });
 }
 
 // FFmpeg path
@@ -62,12 +84,59 @@ app.post('/api/login', (req, res) => {
   if (!phone || !password) {
     return res.status(400).json({ success: false, message: 'Phone and password are required' });
   }
-  if (phone !== AUTH_PHONE || password !== AUTH_PASSWORD) {
-    return res.status(401).json({ success: false, message: 'Invalid credentials' });
+
+  let isAdmin = false;
+
+  if (phone === AUTH_PHONE && password === AUTH_PASSWORD) {
+    isAdmin = true;
+  } else {
+    const users = loadUsers();
+    const user = users.find(u => u.phone === phone && u.password === password);
+    if (!user) return res.status(401).json({ success: false, message: 'Invalid credentials' });
   }
+
   const token = randomBytes(32).toString('hex');
-  sessions.add(token);
-  res.json({ success: true, token });
+  sessions.set(token, { phone, isAdmin });
+  res.json({ success: true, token, isAdmin });
+});
+
+// API: List users (admin only)
+app.get('/api/users', requireAdmin, (req, res) => {
+  const users = loadUsers();
+  res.json(users.map(u => ({ phone: u.phone })));
+});
+
+// API: Create user (admin only)
+app.post('/api/users', requireAdmin, (req, res) => {
+  const { phone, password } = req.body;
+  if (!phone || !password) {
+    return res.status(400).json({ success: false, message: 'Phone and password are required' });
+  }
+  if (phone === AUTH_PHONE) {
+    return res.status(400).json({ success: false, message: 'Cannot create user with admin phone' });
+  }
+  const users = loadUsers();
+  if (users.find(u => u.phone === phone)) {
+    return res.status(400).json({ success: false, message: 'User already exists' });
+  }
+  users.push({ phone, password });
+  saveUsers(users);
+  res.json({ success: true });
+});
+
+// API: Delete user (admin only)
+app.delete('/api/users/:phone', requireAdmin, (req, res) => {
+  const phone = decodeURIComponent(req.params.phone);
+  const users = loadUsers();
+  const idx = users.findIndex(u => u.phone === phone);
+  if (idx === -1) return res.status(404).json({ success: false, message: 'User not found' });
+  users.splice(idx, 1);
+  saveUsers(users);
+  // Invalidate any active sessions for this user
+  for (const [token, session] of sessions.entries()) {
+    if (session.phone === phone) sessions.delete(token);
+  }
+  res.json({ success: true });
 });
 
 // API: Check FFmpeg

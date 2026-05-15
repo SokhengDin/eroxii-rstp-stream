@@ -2,14 +2,32 @@ import 'dotenv/config';
 import { WebSocketServer } from 'ws';
 import { spawn, spawnSync } from 'child_process';
 import http from 'http';
-import { existsSync, readdirSync } from 'fs';
+import { existsSync, readdirSync, readFileSync, writeFileSync } from 'fs';
 import { homedir } from 'os';
-import { join } from 'path';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
 import { randomBytes } from 'crypto';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 const AUTH_PHONE = process.env.AUTH_PHONE;
 const AUTH_PASSWORD = process.env.AUTH_PASSWORD;
-const sessions = new Set();
+const USERS_FILE = join(__dirname, 'users.json');
+
+function loadUsers() {
+  try {
+    if (existsSync(USERS_FILE)) return JSON.parse(readFileSync(USERS_FILE, 'utf8'));
+  } catch {}
+  return [];
+}
+
+function saveUsers(users) {
+  writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
+}
+
+// token -> { phone, isAdmin }
+const sessions = new Map();
 
 const streams = new Map();
 
@@ -112,14 +130,21 @@ const httpServer = http.createServer((req, res) => {
           res.writeHead(400, { 'Content-Type': 'application/json' });
           return res.end(JSON.stringify({ success: false, message: 'Phone and password are required' }));
         }
-        if (phone !== AUTH_PHONE || password !== AUTH_PASSWORD) {
-          res.writeHead(401, { 'Content-Type': 'application/json' });
-          return res.end(JSON.stringify({ success: false, message: 'Invalid credentials' }));
+        let isAdmin = false;
+        if (phone === AUTH_PHONE && password === AUTH_PASSWORD) {
+          isAdmin = true;
+        } else {
+          const users = loadUsers();
+          const user = users.find(u => u.phone === phone && u.password === password);
+          if (!user) {
+            res.writeHead(401, { 'Content-Type': 'application/json' });
+            return res.end(JSON.stringify({ success: false, message: 'Invalid credentials' }));
+          }
         }
         const token = randomBytes(32).toString('hex');
-        sessions.add(token);
+        sessions.set(token, { phone, isAdmin });
         res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ success: true, token }));
+        res.end(JSON.stringify({ success: true, token, isAdmin }));
       } catch (e) {
         res.writeHead(400, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ success: false, message: e.message }));
@@ -133,6 +158,51 @@ const httpServer = http.createServer((req, res) => {
   if (!token || !sessions.has(token)) {
     res.writeHead(401, { 'Content-Type': 'application/json' });
     return res.end(JSON.stringify({ success: false, message: 'Unauthorized' }));
+  }
+  const session = sessions.get(token);
+
+  // List users (admin only)
+  if (url.pathname === '/api/users' && req.method === 'GET') {
+    if (!session.isAdmin) { res.writeHead(403, { 'Content-Type': 'application/json' }); return res.end(JSON.stringify({ success: false, message: 'Forbidden' })); }
+    const users = loadUsers();
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(JSON.stringify(users.map(u => ({ phone: u.phone }))));
+  }
+
+  // Create user (admin only)
+  if (url.pathname === '/api/users' && req.method === 'POST') {
+    if (!session.isAdmin) { res.writeHead(403, { 'Content-Type': 'application/json' }); return res.end(JSON.stringify({ success: false, message: 'Forbidden' })); }
+    let body = '';
+    req.on('data', chunk => body += chunk);
+    req.on('end', () => {
+      try {
+        const { phone, password } = JSON.parse(body);
+        if (!phone || !password) { res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(JSON.stringify({ success: false, message: 'Phone and password are required' })); }
+        if (phone === AUTH_PHONE) { res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(JSON.stringify({ success: false, message: 'Cannot create user with admin phone' })); }
+        const users = loadUsers();
+        if (users.find(u => u.phone === phone)) { res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(JSON.stringify({ success: false, message: 'User already exists' })); }
+        users.push({ phone, password });
+        saveUsers(users);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: true }));
+      } catch (e) { res.writeHead(400, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ success: false, message: e.message })); }
+    });
+    return;
+  }
+
+  // Delete user (admin only)
+  const deleteMatch = url.pathname.match(/^\/api\/users\/(.+)$/);
+  if (deleteMatch && req.method === 'DELETE') {
+    if (!session.isAdmin) { res.writeHead(403, { 'Content-Type': 'application/json' }); return res.end(JSON.stringify({ success: false, message: 'Forbidden' })); }
+    const phone = decodeURIComponent(deleteMatch[1]);
+    const users = loadUsers();
+    const idx = users.findIndex(u => u.phone === phone);
+    if (idx === -1) { res.writeHead(404, { 'Content-Type': 'application/json' }); return res.end(JSON.stringify({ success: false, message: 'User not found' })); }
+    users.splice(idx, 1);
+    saveUsers(users);
+    for (const [t, s] of sessions.entries()) { if (s.phone === phone) sessions.delete(t); }
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(JSON.stringify({ success: true }));
   }
 
   // Check FFmpeg availability

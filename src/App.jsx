@@ -7,6 +7,7 @@ import LoginPage from './pages/LoginPage';
 
 function App() {
   const [authed, setAuthed] = useState(() => !!localStorage.getItem('auth-token'));
+  const [isAdmin, setIsAdmin] = useState(() => localStorage.getItem('auth-is-admin') === 'true');
 
   const [currentPage, setCurrentPage] = useState(() => {
     try {
@@ -20,13 +21,21 @@ function App() {
     localStorage.setItem('app-current-page', currentPage);
   }, [currentPage]);
 
+  const handleLoginSuccess = ({ isAdmin: admin }) => {
+    localStorage.setItem('auth-is-admin', String(admin));
+    setIsAdmin(admin);
+    setAuthed(true);
+  };
+
   const handleLogout = () => {
     localStorage.removeItem('auth-token');
+    localStorage.removeItem('auth-is-admin');
     setAuthed(false);
+    setIsAdmin(false);
   };
 
   if (!authed) {
-    return <LoginPage onLoginSuccess={() => setAuthed(true)} />;
+    return <LoginPage onLoginSuccess={handleLoginSuccess} />;
   }
 
   const renderPage = () => {
@@ -36,7 +45,7 @@ function App() {
       case 'gate':
         return <GateControl />;
       case 'settings':
-        return <Settings />;
+        return <Settings isAdmin={isAdmin} />;
       default:
         return <CameraDisplay />;
     }

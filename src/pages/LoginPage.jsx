@@ -21,7 +21,7 @@ function LoginPage({ onLoginSuccess }) {
       const data = await res.json();
       if (data.success) {
         localStorage.setItem('auth-token', data.token);
-        onLoginSuccess();
+        onLoginSuccess({ isAdmin: !!data.isAdmin });
       } else {
         setError(data.message || 'Invalid credentials');
       }

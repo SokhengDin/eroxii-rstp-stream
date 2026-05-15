@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Save, RotateCcw, Server, Camera, Info, CheckCircle } from 'lucide-react';
+import { Save, RotateCcw, Server, Camera, Info, CheckCircle, Users, Plus, Trash2, Eye, EyeOff } from 'lucide-react';
+import { apiFetch } from '../utils/api';
 
 // Load settings from localStorage
 const loadSettings = () => {
@@ -22,9 +23,60 @@ const saveSettings = (settings) => {
   localStorage.setItem('app-settings', JSON.stringify(settings));
 };
 
-function Settings() {
+function Settings({ isAdmin = false }) {
   const [settings, setSettings] = useState(loadSettings);
   const [status, setStatus] = useState('');
+
+  // User management state
+  const [users, setUsers] = useState([]);
+  const [newPhone, setNewPhone] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [userError, setUserError] = useState('');
+  const [userLoading, setUserLoading] = useState(false);
+
+  useEffect(() => {
+    if (isAdmin) fetchUsers();
+  }, [isAdmin]);
+
+  const fetchUsers = async () => {
+    try {
+      const res = await apiFetch('/api/users');
+      const data = await res.json();
+      setUsers(Array.isArray(data) ? data : []);
+    } catch {}
+  };
+
+  const addUser = async (e) => {
+    e.preventDefault();
+    setUserError('');
+    setUserLoading(true);
+    try {
+      const res = await apiFetch('/api/users', {
+        method: 'POST',
+        body: JSON.stringify({ phone: newPhone, password: newPassword }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setNewPhone('');
+        setNewPassword('');
+        fetchUsers();
+      } else {
+        setUserError(data.message || 'Failed to create user');
+      }
+    } catch {
+      setUserError('Unable to connect to server');
+    } finally {
+      setUserLoading(false);
+    }
+  };
+
+  const deleteUser = async (phone) => {
+    try {
+      await apiFetch(`/api/users/${encodeURIComponent(phone)}`, { method: 'DELETE' });
+      fetchUsers();
+    } catch {}
+  };
 
   // Save settings whenever they change
   useEffect(() => {
@@ -213,6 +265,89 @@ function Settings() {
             </div>
           </div>
         </div>
+
+        {/* User Management — admin only */}
+        {isAdmin && (
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
+            <div className="px-5 py-3.5 border-b border-gray-200">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-indigo-50 rounded-lg">
+                  <Users className="w-5 h-5 text-indigo-600" />
+                </div>
+                <div>
+                  <h2 className="text-base font-semibold text-gray-900">User Management</h2>
+                  <p className="text-sm text-gray-500">Add or remove viewer accounts</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-5 space-y-4">
+              {/* Existing users */}
+              {users.length > 0 ? (
+                <ul className="space-y-2">
+                  {users.map(u => (
+                    <li key={u.phone} className="flex items-center justify-between px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg">
+                      <span className="text-sm font-medium text-gray-800">{u.phone}</span>
+                      <button
+                        onClick={() => deleteUser(u.phone)}
+                        className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                        title="Remove user"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-sm text-gray-400 text-center py-2">No additional users yet</p>
+              )}
+
+              {/* Add user form */}
+              <form onSubmit={addUser} className="space-y-3 pt-2 border-t border-gray-100">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Add User</p>
+                <div>
+                  <input
+                    type="tel"
+                    value={newPhone}
+                    onChange={e => setNewPhone(e.target.value)}
+                    placeholder="Phone number"
+                    required
+                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+                <div className="relative">
+                  <input
+                    type={showNewPassword ? 'text' : 'password'}
+                    value={newPassword}
+                    onChange={e => setNewPassword(e.target.value)}
+                    placeholder="Password"
+                    required
+                    className="w-full px-4 py-2.5 pr-10 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                  <button
+                    type="button"
+                    tabIndex={-1}
+                    onClick={() => setShowNewPassword(v => !v)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+                {userError && (
+                  <p className="text-sm text-red-600">{userError}</p>
+                )}
+                <button
+                  type="submit"
+                  disabled={userLoading}
+                  className="flex items-center gap-2 px-4 py-2.5 bg-indigo-500 text-white text-sm font-medium rounded-lg hover:bg-indigo-600 disabled:opacity-50 transition-colors"
+                >
+                  <Plus className="w-4 h-4" />
+                  {userLoading ? 'Adding…' : 'Add User'}
+                </button>
+              </form>
+            </div>
+          </div>
+        )}
 
         {/* Action Buttons */}
         <div className="flex gap-3 pb-2">
