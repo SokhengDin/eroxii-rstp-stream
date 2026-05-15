@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Plus, Play, Square, X, CheckCircle, XCircle, Info, Maximize, Minimize } from 'lucide-react';
 import RTSPPlayer from '../components/RTSPPlayer';
+import { apiFetch } from '../utils/api';
 
 // Detect if running in Tauri
 const isTauri = typeof window !== 'undefined' && window.__TAURI_INTERNALS__;
@@ -94,7 +95,7 @@ function CameraDisplay() {
         const available = await invoke('check_ffmpeg');
         setFfmpegAvailable(available);
       } else {
-        const res = await fetch(`${API_BASE}/api/check-ffmpeg`);
+        const res = await apiFetch(`${API_BASE}/api/check-ffmpeg`);
         const data = await res.json();
         setFfmpegAvailable(data.available);
       }
@@ -114,9 +115,8 @@ function CameraDisplay() {
           wsPort: camera.wsPort,
         });
       } else {
-        const res = await fetch(`${API_BASE}/api/start-stream`, {
+        const res = await apiFetch(`${API_BASE}/api/start-stream`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ rtspUrl: camera.rtspUrl, wsPort: camera.wsPort }),
         });
         response = await res.json();
@@ -143,9 +143,8 @@ function CameraDisplay() {
       if (isTauri && invoke) {
         await invoke('stop_stream', { wsPort: camera.wsPort });
       } else {
-        await fetch(`${API_BASE}/api/stop-stream`, {
+        await apiFetch(`${API_BASE}/api/stop-stream`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ wsPort: camera.wsPort }),
         });
       }

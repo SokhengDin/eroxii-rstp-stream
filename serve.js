@@ -4,12 +4,15 @@
  * - Provides RTSP streaming API with FFmpeg + WebSocket
  */
 
+import 'dotenv/config';
 import express from 'express';
 import { WebSocketServer } from 'ws';
 import { spawn } from 'child_process';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import net from 'net';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
 
 function isPortInUse(port) {
   return new Promise((resolve) => {
@@ -47,6 +50,26 @@ const app = express();
 const PORT = process.env.PORT || 80;
 const streams = new Map();
 
+const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret_change_in_production';
+const AUTH_PHONE = process.env.AUTH_PHONE;
+const AUTH_PASSWORD_HASH = process.env.AUTH_PASSWORD_HASH;
+
+if (!AUTH_PHONE || !AUTH_PASSWORD_HASH) {
+  console.warn('WARNING: AUTH_PHONE or AUTH_PASSWORD_HASH not set in .env — login will be disabled');
+}
+
+function requireAuth(req, res, next) {
+  const header = req.headers['authorization'];
+  const token = header && header.startsWith('Bearer ') ? header.slice(7) : null;
+  if (!token) return res.status(401).json({ success: false, message: 'Unauthorized' });
+  try {
+    req.user = jwt.verify(token, JWT_SECRET);
+    next();
+  } catch {
+    res.status(401).json({ success: false, message: 'Invalid or expired token' });
+  }
+}
+
 // FFmpeg path
 const FFMPEG_PATH = process.env.FFMPEG_PATH || 'ffmpeg';
 console.log(`Using FFmpeg: ${FFMPEG_PATH}`);
@@ -58,15 +81,35 @@ app.use(express.json());
 app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   if (req.method === 'OPTIONS') {
     return res.sendStatus(204);
   }
   next();
 });
 
+// API: Login
+app.post('/api/login', async (req, res) => {
+  const { phone, password } = req.body;
+  if (!phone || !password) {
+    return res.status(400).json({ success: false, message: 'Phone and password are required' });
+  }
+  if (!AUTH_PHONE || !AUTH_PASSWORD_HASH) {
+    return res.status(503).json({ success: false, message: 'Auth not configured on server' });
+  }
+  if (phone !== AUTH_PHONE) {
+    return res.status(401).json({ success: false, message: 'Invalid credentials' });
+  }
+  const valid = await bcrypt.compare(password, AUTH_PASSWORD_HASH);
+  if (!valid) {
+    return res.status(401).json({ success: false, message: 'Invalid credentials' });
+  }
+  const token = jwt.sign({ phone }, JWT_SECRET);
+  res.json({ success: true, token });
+});
+
 // API: Check FFmpeg
-app.get('/api/check-ffmpeg', (req, res) => {
+app.get('/api/check-ffmpeg', requireAuth, (req, res) => {
   const ffmpeg = spawn(FFMPEG_PATH, ['-version']);
   ffmpeg.on('error', () => {
     res.json({ available: false });
@@ -77,7 +120,7 @@ app.get('/api/check-ffmpeg', (req, res) => {
 });
 
 // API: Start stream
-app.post('/api/start-stream', (req, res) => {
+app.post('/api/start-stream', requireAuth, (req, res) => {
   const { rtspUrl, wsPort } = req.body;
 
   if (!rtspUrl || !wsPort) {
@@ -100,14 +143,14 @@ app.post('/api/start-stream', (req, res) => {
 });
 
 // API: Stop stream
-app.post('/api/stop-stream', (req, res) => {
+app.post('/api/stop-stream', requireAuth, (req, res) => {
   const { wsPort } = req.body;
   const result = stopStream(wsPort);
   res.json(result);
 });
 
 // API: Get active streams
-app.get('/api/streams', (req, res) => {
+app.get('/api/streams', requireAuth, (req, res) => {
   const activeStreams = Array.from(streams.entries()).map(([port, info]) => ({
     port,
     rtsp_url: info.rtspUrl,

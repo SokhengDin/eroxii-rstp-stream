@@ -22,3 +22,13 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+
+# ignore tests
+tests/
+./tests
+
+# Environment / secrets
+.env
+.env.local
+.env.*.local

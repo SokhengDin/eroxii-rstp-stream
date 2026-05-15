@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Video, DoorOpen, Settings, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Video, DoorOpen, Settings, ChevronLeft, ChevronRight, LogOut } from 'lucide-react';
 
-const Sidebar = ({ currentPage, onPageChange }) => {
+const Sidebar = ({ currentPage, onPageChange, onLogout }) => {
   // Load sidebar state from localStorage, default to true (expanded)
   const [isExpanded, setIsExpanded] = useState(() => {
     try {
@@ -64,8 +64,18 @@ const Sidebar = ({ currentPage, onPageChange }) => {
         })}
       </nav>
 
-      {/* Toggle Button */}
-      <div className="p-3 border-t border-gray-200">
+      {/* Bottom: Logout + Toggle */}
+      <div className="p-3 border-t border-gray-200 space-y-1">
+        {onLogout && (
+          <button
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-gray-600 hover:bg-red-50 hover:text-red-600 transition-all duration-200"
+            onClick={onLogout}
+            title={!isExpanded ? 'Sign out' : ''}
+          >
+            <LogOut className="w-5 h-5 flex-shrink-0" />
+            {isExpanded && <span className="font-medium text-sm">Sign Out</span>}
+          </button>
+        )}
         <button
           className="w-full flex items-center justify-center p-3 rounded-xl text-gray-600 hover:bg-gray-50 transition-all duration-200"
           onClick={() => setIsExpanded(!isExpanded)}
