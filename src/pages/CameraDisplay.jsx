@@ -379,49 +379,50 @@ function CameraDisplay() {
         <div className={`flex-1 grid min-h-0 overflow-hidden ${isFullscreen ? 'gap-0' : 'gap-3'}`} style={{ gridTemplateColumns: `repeat(${getGridCols(getCurrentPageCameras().length)}, 1fr)`, gridAutoRows: '1fr' }}>
           {getCurrentPageCameras().map((camera) => (
             <div key={camera.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm flex flex-col min-h-0 min-w-0">
-              <div className="flex items-center justify-between px-2 py-1 border-b border-gray-200 flex-shrink-0">
-                <h3 className="font-medium text-gray-900 text-xs truncate">{camera.name}</h3>
-                <div className="flex items-center gap-1">
-                  {!camera.active ? (
-                    <button
-                      onClick={() => startStream(camera)}
-                      disabled={!ffmpegAvailable}
-                      className="p-1 text-green-600 hover:bg-green-50 rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                      title="Start stream"
-                    >
-                      <Play className="w-3 h-3" />
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => stopStream(camera)}
-                      className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
-                      title="Stop stream"
-                    >
-                      <Square className="w-3 h-3" />
-                    </button>
+              {/* Card header */}
+              <div className="flex items-center gap-1 px-2 py-1 border-b border-gray-200 flex-shrink-0 min-w-0">
+                <h3 className="font-medium text-gray-900 text-xs truncate flex-1 min-w-0">{camera.name}</h3>
+                <div className="flex items-center gap-0.5 flex-shrink-0">
+                  {mode === 'jsmpeg' && (
+                    !camera.active ? (
+                      <button
+                        onClick={() => startStream(camera)}
+                        disabled={!ffmpegAvailable}
+                        className="p-1 text-green-600 hover:bg-green-50 rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                        title="Start"
+                      >
+                        <Play className="w-3 h-3" />
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => stopStream(camera)}
+                        className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
+                        title="Stop"
+                      >
+                        <Square className="w-3 h-3" />
+                      </button>
+                    )
                   )}
                   <button
                     onClick={() => removeCamera(camera)}
                     className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
-                    title="Remove camera"
+                    title="Remove"
                   >
                     <X className="w-3 h-3" />
                   </button>
                 </div>
               </div>
-              <div className="flex-1 bg-gray-900 relative overflow-hidden min-h-0 max-h-full">
+              {/* Video area */}
+              <div className="flex-1 bg-gray-900 relative overflow-hidden min-h-0">
                 {mode === 'webrtc' ? (
                   <WebRTCPlayer streamName={go2rtcStreamName(camera)} />
                 ) : camera.active && camera.wsUrl ? (
                   <RTSPPlayer wsUrl={camera.wsUrl} width={1920} height={1080} />
                 ) : (
                   <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="text-center px-6">
-                      <div className="w-12 h-12 rounded-full bg-gray-800 flex items-center justify-center mx-auto mb-3">
-                        <Play className="w-6 h-6 text-gray-500" />
-                      </div>
-                      <p className="text-gray-400 font-medium mb-1 text-sm">{camera.name}</p>
-                      <p className="text-xs text-gray-600 break-all line-clamp-2">{camera.rtspUrl}</p>
+                    <div className="text-center px-3">
+                      <Play className="w-6 h-6 text-gray-600 mx-auto mb-1" />
+                      <p className="text-gray-400 text-xs font-medium truncate max-w-full">{camera.name}</p>
                     </div>
                   </div>
                 )}
