@@ -152,6 +152,7 @@ app.get('/api/streams', requireAuth, (req, res) => {
 // Proxy: go2rtc API — authenticated, proxied over port 80 so Cloudflare can reach it
 app.use('/api/go2rtc', requireAuth, (req, res) => {
   const target = new URL(GO2RTC_URL);
+  console.log(`[go2rtc proxy] ${req.method} ${req.url}`);
   const options = {
     hostname: target.hostname,
     port: target.port || 1984,
