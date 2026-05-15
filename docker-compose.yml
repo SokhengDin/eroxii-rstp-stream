@@ -7,17 +7,15 @@ services:
     env_file:
       - .env
     environment:
-      - GO2RTC_URL=http://go2rtc:1984
+      - GO2RTC_URL=http://127.0.0.1:1984
     depends_on:
       - go2rtc
     restart: unless-stopped
+    network_mode: host
 
   go2rtc:
     image: alexxit/go2rtc
-    ports:
-      - "1984:1984"
-      - "8554:8554"
-      - "8555:8555/tcp"
     volumes:
       - ./go2rtc.yaml:/config/go2rtc.yaml
     restart: unless-stopped
+    network_mode: host
