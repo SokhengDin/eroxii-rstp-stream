@@ -34,5 +34,6 @@ tests/
 .env.local
 .env.*.local
 
-# User data
+# User/camera data
 users.json
+cameras.json

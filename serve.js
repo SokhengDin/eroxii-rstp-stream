@@ -28,6 +28,7 @@ const AUTH_PHONE = process.env.AUTH_PHONE;
 const AUTH_PASSWORD = process.env.AUTH_PASSWORD;
 const GO2RTC_URL = process.env.GO2RTC_URL || 'http://127.0.0.1:1984';
 const USERS_FILE = join(__dirname, 'users.json');
+const CAMERAS_FILE = join(__dirname, 'cameras.json');
 
 // Load persisted users from disk
 function loadUsers() {
@@ -39,6 +40,17 @@ function loadUsers() {
 
 function saveUsers(users) {
   writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
+}
+
+function loadCameras() {
+  try {
+    if (existsSync(CAMERAS_FILE)) return JSON.parse(readFileSync(CAMERAS_FILE, 'utf8'));
+  } catch {}
+  return [];
+}
+
+function saveCameras(cameras) {
+  writeFileSync(CAMERAS_FILE, JSON.stringify(cameras, null, 2));
 }
 
 // In-memory session tokens: token -> { phone, isAdmin }
@@ -136,6 +148,35 @@ app.delete('/api/users/:phone', requireAdmin, (req, res) => {
   for (const [token, session] of sessions.entries()) {
     if (session.phone === phone) sessions.delete(token);
   }
+  res.json({ success: true });
+});
+
+// API: Get cameras (all authenticated users)
+app.get('/api/cameras', requireAuth, (req, res) => {
+  res.json(loadCameras());
+});
+
+// API: Add camera (admin only)
+app.post('/api/cameras', requireAdmin, (req, res) => {
+  const { name, rtspUrl } = req.body;
+  if (!name || !rtspUrl) {
+    return res.status(400).json({ success: false, message: 'name and rtspUrl are required' });
+  }
+  const cameras = loadCameras();
+  const camera = { id: Date.now(), name, rtspUrl, wsPort: 9900 + cameras.length };
+  cameras.push(camera);
+  saveCameras(cameras);
+  res.json({ success: true, camera });
+});
+
+// API: Delete camera (admin only)
+app.delete('/api/cameras/:id', requireAdmin, (req, res) => {
+  const id = Number(req.params.id);
+  const cameras = loadCameras();
+  const idx = cameras.findIndex(c => c.id === id);
+  if (idx === -1) return res.status(404).json({ success: false, message: 'Camera not found' });
+  cameras.splice(idx, 1);
+  saveCameras(cameras);
   res.json({ success: true });
 });
 

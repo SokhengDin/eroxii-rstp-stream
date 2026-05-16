@@ -11,6 +11,7 @@ services:
     network_mode: host
     volumes:
       - ./users.json:/app/users.json
+      - ./cameras.json:/app/cameras.json
 
   go2rtc:
     image: alexxit/go2rtc

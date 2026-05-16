@@ -14,6 +14,7 @@ const __dirname = dirname(__filename);
 const AUTH_PHONE = process.env.AUTH_PHONE;
 const AUTH_PASSWORD = process.env.AUTH_PASSWORD;
 const USERS_FILE = join(__dirname, 'users.json');
+const CAMERAS_FILE = join(__dirname, 'cameras.json');
 
 function loadUsers() {
   try {
@@ -24,6 +25,17 @@ function loadUsers() {
 
 function saveUsers(users) {
   writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
+}
+
+function loadCameras() {
+  try {
+    if (existsSync(CAMERAS_FILE)) return JSON.parse(readFileSync(CAMERAS_FILE, 'utf8'));
+  } catch {}
+  return [];
+}
+
+function saveCameras(cameras) {
+  writeFileSync(CAMERAS_FILE, JSON.stringify(cameras, null, 2));
 }
 
 // token -> { phone, isAdmin }
@@ -191,16 +203,56 @@ const httpServer = http.createServer((req, res) => {
   }
 
   // Delete user (admin only)
-  const deleteMatch = url.pathname.match(/^\/api\/users\/(.+)$/);
-  if (deleteMatch && req.method === 'DELETE') {
+  const deleteUserMatch = url.pathname.match(/^\/api\/users\/(.+)$/);
+  if (deleteUserMatch && req.method === 'DELETE') {
     if (!session.isAdmin) { res.writeHead(403, { 'Content-Type': 'application/json' }); return res.end(JSON.stringify({ success: false, message: 'Forbidden' })); }
-    const phone = decodeURIComponent(deleteMatch[1]);
+    const phone = decodeURIComponent(deleteUserMatch[1]);
     const users = loadUsers();
     const idx = users.findIndex(u => u.phone === phone);
     if (idx === -1) { res.writeHead(404, { 'Content-Type': 'application/json' }); return res.end(JSON.stringify({ success: false, message: 'User not found' })); }
     users.splice(idx, 1);
     saveUsers(users);
     for (const [t, s] of sessions.entries()) { if (s.phone === phone) sessions.delete(t); }
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(JSON.stringify({ success: true }));
+  }
+
+  // Get cameras (all authenticated users)
+  if (url.pathname === '/api/cameras' && req.method === 'GET') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(JSON.stringify(loadCameras()));
+  }
+
+  // Add camera (admin only)
+  if (url.pathname === '/api/cameras' && req.method === 'POST') {
+    if (!session.isAdmin) { res.writeHead(403, { 'Content-Type': 'application/json' }); return res.end(JSON.stringify({ success: false, message: 'Forbidden' })); }
+    let body = '';
+    req.on('data', chunk => body += chunk);
+    req.on('end', () => {
+      try {
+        const { name, rtspUrl } = JSON.parse(body);
+        if (!name || !rtspUrl) { res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(JSON.stringify({ success: false, message: 'name and rtspUrl are required' })); }
+        const cameras = loadCameras();
+        const camera = { id: Date.now(), name, rtspUrl, wsPort: 9900 + cameras.length };
+        cameras.push(camera);
+        saveCameras(cameras);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: true, camera }));
+      } catch (e) { res.writeHead(400, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ success: false, message: e.message })); }
+    });
+    return;
+  }
+
+  // Delete camera (admin only)
+  const deleteCameraMatch = url.pathname.match(/^\/api\/cameras\/(\d+)$/);
+  if (deleteCameraMatch && req.method === 'DELETE') {
+    if (!session.isAdmin) { res.writeHead(403, { 'Content-Type': 'application/json' }); return res.end(JSON.stringify({ success: false, message: 'Forbidden' })); }
+    const id = Number(deleteCameraMatch[1]);
+    const cameras = loadCameras();
+    const idx = cameras.findIndex(c => c.id === id);
+    if (idx === -1) { res.writeHead(404, { 'Content-Type': 'application/json' }); return res.end(JSON.stringify({ success: false, message: 'Camera not found' })); }
+    cameras.splice(idx, 1);
+    saveCameras(cameras);
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(JSON.stringify({ success: true }));
   }

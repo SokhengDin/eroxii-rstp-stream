@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Save, RotateCcw, Server, Camera, Info, CheckCircle, Users, Plus, Trash2, Eye, EyeOff } from 'lucide-react';
+import { Save, RotateCcw, Server, Camera, Info, CheckCircle, Users, Plus, Trash2, Eye, EyeOff, Video } from 'lucide-react';
 import { apiFetch } from '../utils/api';
 
 // Load settings from localStorage
@@ -75,6 +75,56 @@ function Settings({ isAdmin = false }) {
     try {
       await apiFetch(`/api/users/${encodeURIComponent(phone)}`, { method: 'DELETE' });
       fetchUsers();
+    } catch {}
+  };
+
+  // Camera management state
+  const [cameras, setCameras] = useState([]);
+  const [newCamName, setNewCamName] = useState('');
+  const [newCamUrl, setNewCamUrl] = useState('');
+  const [camError, setCamError] = useState('');
+  const [camLoading, setCamLoading] = useState(false);
+
+  useEffect(() => {
+    if (isAdmin) fetchCameras();
+  }, [isAdmin]);
+
+  const fetchCameras = async () => {
+    try {
+      const res = await apiFetch('/api/cameras');
+      const data = await res.json();
+      setCameras(Array.isArray(data) ? data : []);
+    } catch {}
+  };
+
+  const addCamera = async (e) => {
+    e.preventDefault();
+    setCamError('');
+    setCamLoading(true);
+    try {
+      const res = await apiFetch('/api/cameras', {
+        method: 'POST',
+        body: JSON.stringify({ name: newCamName, rtspUrl: newCamUrl }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setNewCamName('');
+        setNewCamUrl('');
+        fetchCameras();
+      } else {
+        setCamError(data.message || 'Failed to add camera');
+      }
+    } catch {
+      setCamError('Unable to connect to server');
+    } finally {
+      setCamLoading(false);
+    }
+  };
+
+  const deleteCamera = async (id) => {
+    try {
+      await apiFetch(`/api/cameras/${id}`, { method: 'DELETE' });
+      fetchCameras();
     } catch {}
   };
 
@@ -265,6 +315,76 @@ function Settings({ isAdmin = false }) {
             </div>
           </div>
         </div>
+
+        {/* Camera Management — admin only */}
+        {isAdmin && (
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
+            <div className="px-5 py-3.5 border-b border-gray-200">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-blue-50 rounded-lg">
+                  <Video className="w-5 h-5 text-blue-600" />
+                </div>
+                <div>
+                  <h2 className="text-base font-semibold text-gray-900">Camera Management</h2>
+                  <p className="text-sm text-gray-500">Add or remove RTSP camera streams</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-5 space-y-4">
+              {cameras.length > 0 ? (
+                <ul className="space-y-2">
+                  {cameras.map(c => (
+                    <li key={c.id} className="flex items-center justify-between gap-2 px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-gray-800 truncate">{c.name}</p>
+                        <p className="text-xs text-gray-400 truncate">{c.rtspUrl}</p>
+                      </div>
+                      <button
+                        onClick={() => deleteCamera(c.id)}
+                        className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors flex-shrink-0"
+                        title="Remove camera"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-sm text-gray-400 text-center py-2">No cameras added yet</p>
+              )}
+
+              <form onSubmit={addCamera} className="space-y-3 pt-2 border-t border-gray-100">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Add Camera</p>
+                <input
+                  type="text"
+                  value={newCamName}
+                  onChange={e => setNewCamName(e.target.value)}
+                  placeholder="Camera name (e.g. Front Door)"
+                  required
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+                <input
+                  type="text"
+                  value={newCamUrl}
+                  onChange={e => setNewCamUrl(e.target.value)}
+                  placeholder="rtsp://user:pass@192.168.1.x:554/stream"
+                  required
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+                {camError && <p className="text-sm text-red-600">{camError}</p>}
+                <button
+                  type="submit"
+                  disabled={camLoading}
+                  className="flex items-center gap-2 px-4 py-2.5 bg-blue-500 text-white text-sm font-medium rounded-lg hover:bg-blue-600 disabled:opacity-50 transition-colors"
+                >
+                  <Plus className="w-4 h-4" />
+                  {camLoading ? 'Adding…' : 'Add Camera'}
+                </button>
+              </form>
+            </div>
+          </div>
+        )}
 
         {/* User Management — admin only */}
         {isAdmin && (
