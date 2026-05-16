@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Eye, EyeOff, LogIn } from 'lucide-react';
 
 function LoginPage({ onLoginSuccess }) {
-  const [phone, setPhone] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
@@ -16,7 +16,7 @@ function LoginPage({ onLoginSuccess }) {
       const res = await fetch('/api/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone, password }),
+        body: JSON.stringify({ username, password }),
       });
       const data = await res.json();
       if (data.success) {
@@ -48,18 +48,17 @@ function LoginPage({ onLoginSuccess }) {
           </div>
 
           <form onSubmit={handleSubmit} className="p-6 space-y-4">
-            {/* Phone */}
             <div>
-              <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-1.5">
-                Phone Number
+              <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-1.5">
+                Username
               </label>
               <input
-                id="phone"
-                type="tel"
+                id="username"
+                type="text"
                 autoComplete="username"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="0123456789"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="Enter your username"
                 required
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />

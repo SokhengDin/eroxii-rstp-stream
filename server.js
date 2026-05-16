@@ -11,7 +11,7 @@ import { randomBytes } from 'crypto';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-const AUTH_PHONE = process.env.AUTH_PHONE;
+const AUTH_USERNAME = process.env.AUTH_USERNAME || process.env.AUTH_USERNAME;
 const AUTH_PASSWORD = process.env.AUTH_PASSWORD;
 const USERS_FILE = join(__dirname, 'users.json');
 const CAMERAS_FILE = join(__dirname, 'cameras.json');
@@ -38,7 +38,7 @@ function saveCameras(cameras) {
   writeFileSync(CAMERAS_FILE, JSON.stringify(cameras, null, 2));
 }
 
-// token -> { phone, isAdmin }
+// token -> { username, isAdmin }
 const sessions = new Map();
 
 const streams = new Map();
@@ -137,24 +137,24 @@ const httpServer = http.createServer((req, res) => {
     req.on('data', chunk => body += chunk);
     req.on('end', () => {
       try {
-        const { phone, password } = JSON.parse(body);
-        if (!phone || !password) {
+        const { username, password } = JSON.parse(body);
+        if (!username || !password) {
           res.writeHead(400, { 'Content-Type': 'application/json' });
-          return res.end(JSON.stringify({ success: false, message: 'Phone and password are required' }));
+          return res.end(JSON.stringify({ success: false, message: 'Username and password are required' }));
         }
         let isAdmin = false;
-        if (phone === AUTH_PHONE && password === AUTH_PASSWORD) {
+        if (username === AUTH_USERNAME && password === AUTH_PASSWORD) {
           isAdmin = true;
         } else {
           const users = loadUsers();
-          const user = users.find(u => u.phone === phone && u.password === password);
+          const user = users.find(u => u.username === username && u.password === password);
           if (!user) {
             res.writeHead(401, { 'Content-Type': 'application/json' });
             return res.end(JSON.stringify({ success: false, message: 'Invalid credentials' }));
           }
         }
         const token = randomBytes(32).toString('hex');
-        sessions.set(token, { phone, isAdmin });
+        sessions.set(token, { username, isAdmin });
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ success: true, token, isAdmin }));
       } catch (e) {
@@ -178,7 +178,7 @@ const httpServer = http.createServer((req, res) => {
     if (!session.isAdmin) { res.writeHead(403, { 'Content-Type': 'application/json' }); return res.end(JSON.stringify({ success: false, message: 'Forbidden' })); }
     const users = loadUsers();
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    return res.end(JSON.stringify(users.map(u => ({ phone: u.phone }))));
+    return res.end(JSON.stringify(users.map(u => ({ username: u.username }))));
   }
 
   // Create user (admin only)
@@ -188,12 +188,12 @@ const httpServer = http.createServer((req, res) => {
     req.on('data', chunk => body += chunk);
     req.on('end', () => {
       try {
-        const { phone, password } = JSON.parse(body);
-        if (!phone || !password) { res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(JSON.stringify({ success: false, message: 'Phone and password are required' })); }
-        if (phone === AUTH_PHONE) { res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(JSON.stringify({ success: false, message: 'Cannot create user with admin phone' })); }
+        const { username, password } = JSON.parse(body);
+        if (!username || !password) { res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(JSON.stringify({ success: false, message: 'Username and password are required' })); }
+        if (username === AUTH_USERNAME) { res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(JSON.stringify({ success: false, message: 'Cannot create user with admin username' })); }
         const users = loadUsers();
-        if (users.find(u => u.phone === phone)) { res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(JSON.stringify({ success: false, message: 'User already exists' })); }
-        users.push({ phone, password });
+        if (users.find(u => u.username === username)) { res.writeHead(400, { 'Content-Type': 'application/json' }); return res.end(JSON.stringify({ success: false, message: 'User already exists' })); }
+        users.push({ username, password });
         saveUsers(users);
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ success: true }));
@@ -206,13 +206,13 @@ const httpServer = http.createServer((req, res) => {
   const deleteUserMatch = url.pathname.match(/^\/api\/users\/(.+)$/);
   if (deleteUserMatch && req.method === 'DELETE') {
     if (!session.isAdmin) { res.writeHead(403, { 'Content-Type': 'application/json' }); return res.end(JSON.stringify({ success: false, message: 'Forbidden' })); }
-    const phone = decodeURIComponent(deleteUserMatch[1]);
+    const username = decodeURIComponent(deleteUserMatch[1]);
     const users = loadUsers();
-    const idx = users.findIndex(u => u.phone === phone);
+    const idx = users.findIndex(u => u.username === username);
     if (idx === -1) { res.writeHead(404, { 'Content-Type': 'application/json' }); return res.end(JSON.stringify({ success: false, message: 'User not found' })); }
     users.splice(idx, 1);
     saveUsers(users);
-    for (const [t, s] of sessions.entries()) { if (s.phone === phone) sessions.delete(t); }
+    for (const [t, s] of sessions.entries()) { if (s.username === username) sessions.delete(t); }
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(JSON.stringify({ success: true }));
   }

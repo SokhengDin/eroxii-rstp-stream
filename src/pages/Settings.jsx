@@ -29,7 +29,7 @@ function Settings({ isAdmin = false }) {
 
   // User management state
   const [users, setUsers] = useState([]);
-  const [newPhone, setNewPhone] = useState('');
+  const [newUsername, setNewUsername] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [userError, setUserError] = useState('');
@@ -54,11 +54,11 @@ function Settings({ isAdmin = false }) {
     try {
       const res = await apiFetch('/api/users', {
         method: 'POST',
-        body: JSON.stringify({ phone: newPhone, password: newPassword }),
+        body: JSON.stringify({ username: newUsername, password: newPassword }),
       });
       const data = await res.json();
       if (data.success) {
-        setNewPhone('');
+        setNewUsername('');
         setNewPassword('');
         fetchUsers();
       } else {
@@ -71,9 +71,9 @@ function Settings({ isAdmin = false }) {
     }
   };
 
-  const deleteUser = async (phone) => {
+  const deleteUser = async (username) => {
     try {
-      await apiFetch(`/api/users/${encodeURIComponent(phone)}`, { method: 'DELETE' });
+      await apiFetch(`/api/users/${encodeURIComponent(username)}`, { method: 'DELETE' });
       fetchUsers();
     } catch {}
   };
@@ -406,10 +406,10 @@ function Settings({ isAdmin = false }) {
               {users.length > 0 ? (
                 <ul className="space-y-2">
                   {users.map(u => (
-                    <li key={u.phone} className="flex items-center justify-between px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg">
-                      <span className="text-sm font-medium text-gray-800">{u.phone}</span>
+                    <li key={u.username} className="flex items-center justify-between px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg">
+                      <span className="text-sm font-medium text-gray-800">{u.username}</span>
                       <button
-                        onClick={() => deleteUser(u.phone)}
+                        onClick={() => deleteUser(u.username)}
                         className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
                         title="Remove user"
                       >
@@ -427,10 +427,10 @@ function Settings({ isAdmin = false }) {
                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Add User</p>
                 <div>
                   <input
-                    type="tel"
-                    value={newPhone}
-                    onChange={e => setNewPhone(e.target.value)}
-                    placeholder="Phone number"
+                    type="text"
+                    value={newUsername}
+                    onChange={e => setNewUsername(e.target.value)}
+                    placeholder="Username"
                     required
                     className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />

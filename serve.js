@@ -24,7 +24,7 @@ const app = express();
 const PORT = process.env.PORT || 80;
 const streams = new Map(); // streamId -> { rtspUrl, ffmpeg, wss }
 
-const AUTH_PHONE = process.env.AUTH_PHONE;
+const AUTH_USERNAME = process.env.AUTH_USERNAME || process.env.AUTH_USERNAME;
 const AUTH_PASSWORD = process.env.AUTH_PASSWORD;
 const GO2RTC_URL = process.env.GO2RTC_URL || 'http://127.0.0.1:1984';
 const USERS_FILE = join(__dirname, 'users.json');
@@ -53,7 +53,7 @@ function saveCameras(cameras) {
   writeFileSync(CAMERAS_FILE, JSON.stringify(cameras, null, 2));
 }
 
-// In-memory session tokens: token -> { phone, isAdmin }
+// In-memory session tokens: token -> { username, isAdmin }
 const sessions = new Map();
 
 function requireAuth(req, res, next) {
@@ -92,61 +92,61 @@ app.use((req, res, next) => {
 
 // API: Login
 app.post('/api/login', (req, res) => {
-  const { phone, password } = req.body;
-  if (!phone || !password) {
-    return res.status(400).json({ success: false, message: 'Phone and password are required' });
+  const { username, password } = req.body;
+  if (!username || !password) {
+    return res.status(400).json({ success: false, message: 'Username and password are required' });
   }
 
   let isAdmin = false;
 
-  if (phone === AUTH_PHONE && password === AUTH_PASSWORD) {
+  if (username === AUTH_USERNAME && password === AUTH_PASSWORD) {
     isAdmin = true;
   } else {
     const users = loadUsers();
-    const user = users.find(u => u.phone === phone && u.password === password);
+    const user = users.find(u => u.username === username && u.password === password);
     if (!user) return res.status(401).json({ success: false, message: 'Invalid credentials' });
   }
 
   const token = randomBytes(32).toString('hex');
-  sessions.set(token, { phone, isAdmin });
+  sessions.set(token, { username, isAdmin });
   res.json({ success: true, token, isAdmin });
 });
 
 // API: List users (admin only)
 app.get('/api/users', requireAdmin, (req, res) => {
   const users = loadUsers();
-  res.json(users.map(u => ({ phone: u.phone })));
+  res.json(users.map(u => ({ username: u.username })));
 });
 
 // API: Create user (admin only)
 app.post('/api/users', requireAdmin, (req, res) => {
-  const { phone, password } = req.body;
-  if (!phone || !password) {
-    return res.status(400).json({ success: false, message: 'Phone and password are required' });
+  const { username, password } = req.body;
+  if (!username || !password) {
+    return res.status(400).json({ success: false, message: 'Username and password are required' });
   }
-  if (phone === AUTH_PHONE) {
-    return res.status(400).json({ success: false, message: 'Cannot create user with admin phone' });
+  if (username === AUTH_USERNAME) {
+    return res.status(400).json({ success: false, message: 'Cannot create user with admin username' });
   }
   const users = loadUsers();
-  if (users.find(u => u.phone === phone)) {
+  if (users.find(u => u.username === username)) {
     return res.status(400).json({ success: false, message: 'User already exists' });
   }
-  users.push({ phone, password });
+  users.push({ username, password });
   saveUsers(users);
   res.json({ success: true });
 });
 
 // API: Delete user (admin only)
-app.delete('/api/users/:phone', requireAdmin, (req, res) => {
-  const phone = decodeURIComponent(req.params.phone);
+app.delete('/api/users/:username', requireAdmin, (req, res) => {
+  const username = decodeURIComponent(req.params.username);
   const users = loadUsers();
-  const idx = users.findIndex(u => u.phone === phone);
+  const idx = users.findIndex(u => u.username === username);
   if (idx === -1) return res.status(404).json({ success: false, message: 'User not found' });
   users.splice(idx, 1);
   saveUsers(users);
   // Invalidate any active sessions for this user
   for (const [token, session] of sessions.entries()) {
-    if (session.phone === phone) sessions.delete(token);
+    if (session.username === username) sessions.delete(token);
   }
   res.json({ success: true });
 });
